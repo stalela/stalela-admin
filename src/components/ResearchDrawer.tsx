@@ -1,7 +1,19 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { X, RefreshCw, Sparkles, Clock, Loader2, Mail } from "lucide-react";
+import {
+  X,
+  RefreshCw,
+  Sparkles,
+  Clock,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Send,
+  ArrowLeft,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ReportView } from "@/components/ReportView";
 
 interface ResearchDrawerProps {
@@ -37,6 +49,15 @@ export function ResearchDrawer({
   const contentRef = useRef<HTMLDivElement>(null);
   const streamStartRef = useRef<number>(0);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Chat state
+  type ChatMessage = { role: "user" | "assistant"; content: string };
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatStreaming, setChatStreaming] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatAbortRef = useRef<AbortController | null>(null);
 
   const startProgressAnimation = useCallback(() => {
     streamStartRef.current = Date.now();
@@ -152,6 +173,109 @@ export function ResearchDrawer({
     [companyId, startProgressAnimation, stopProgressAnimation]
   );
 
+  // Send a chat message
+  const sendChatMessage = useCallback(
+    async (question: string) => {
+      if (!question.trim() || chatStreaming) return;
+
+      // Abort previous chat stream if any
+      if (chatAbortRef.current) chatAbortRef.current.abort();
+      const controller = new AbortController();
+      chatAbortRef.current = controller;
+
+      const userMsg: ChatMessage = { role: "user", content: question.trim() };
+      setChatMessages((prev) => [...prev, userMsg]);
+      setChatInput("");
+      setChatStreaming(true);
+
+      // Add an empty assistant message to stream into
+      setChatMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      try {
+        const res = await fetch("/api/companies/research/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId,
+            question: question.trim(),
+            history: chatMessages,
+            report,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Request failed" }));
+          throw new Error(err.error || `Error ${res.status}`);
+        }
+
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const data = trimmed.slice(5).trim();
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                setChatMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last.role === "assistant") {
+                    updated[updated.length - 1] = {
+                      ...last,
+                      content: last.content + parsed.content,
+                    };
+                  }
+                  return updated;
+                });
+              }
+            } catch {
+              // skip
+            }
+          }
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        // Replace the empty assistant message with an error
+        setChatMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last.role === "assistant" && !last.content) {
+            updated[updated.length - 1] = {
+              role: "assistant",
+              content: `_Error: ${e instanceof Error ? e.message : "Failed to get response"}_`,
+            };
+          }
+          return updated;
+        });
+      } finally {
+        setChatStreaming(false);
+        chatAbortRef.current = null;
+      }
+    },
+    [companyId, chatMessages, chatStreaming, report]
+  );
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatOpen && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, chatOpen]);
+
   // Auto-fetch on open when no report is loaded
   useEffect(() => {
     if (open && !report && !streaming && !error) {
@@ -165,12 +289,16 @@ export function ResearchDrawer({
     setCached(false);
     setCachedAt(null);
     setError(null);
+    setChatMessages([]);
+    setChatOpen(false);
+    setChatInput("");
   }, [companyId]);
 
   // Abort on close/unmount
   useEffect(() => {
     return () => {
       if (abortRef.current) abortRef.current.abort();
+      if (chatAbortRef.current) chatAbortRef.current.abort();
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
   }, []);
@@ -225,8 +353,15 @@ export function ResearchDrawer({
                 {new Date(cachedAt).toLocaleDateString()}
               </span>
             )}
-            {report && !streaming && (
+            {report && !streaming && !chatOpen && (
               <>
+                <button
+                  onClick={() => setChatOpen(true)}
+                  className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"
+                  title="Ask questions about this company"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </button>
                 <button
                   onClick={() => {
                     const subject = encodeURIComponent(
@@ -251,6 +386,15 @@ export function ResearchDrawer({
                   <RefreshCw className="h-4 w-4" />
                 </button>
               </>
+            )}
+            {chatOpen && (
+              <button
+                onClick={() => setChatOpen(false)}
+                className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"
+                title="Back to report"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
             )}
             <button
               onClick={onClose}
@@ -323,10 +467,105 @@ export function ResearchDrawer({
           )}
 
           {/* Completed report — tabbed view */}
-          {report && !streaming && (
+          {report && !streaming && !chatOpen && (
             <ReportView markdown={report} />
           )}
+
+          {/* Chat view */}
+          {chatOpen && (
+            <div className="flex flex-col gap-4">
+              {chatMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                  <MessageSquare className="h-8 w-8 text-muted" />
+                  <p className="text-sm text-muted">
+                    Ask anything about {companyName}
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 mt-2">
+                    {[
+                      "What are their biggest pain points?",
+                      "Draft a follow-up email",
+                      "Summarize their digital presence",
+                      "What products do we offer that fit?",
+                    ].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => sendChatMessage(q)}
+                        className="rounded-full border border-border bg-surface-elevated px-3 py-1.5 text-xs text-muted hover:border-copper-light hover:text-copper-light transition-colors"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-xl px-4 py-3 text-sm ${
+                      msg.role === "user"
+                        ? "bg-copper-light/15 text-foreground"
+                        : "bg-surface-elevated text-muted"
+                    }`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <article className="prose prose-invert prose-sm max-w-none prose-p:text-muted prose-p:leading-relaxed prose-strong:text-copper-light prose-a:text-copper-light prose-a:underline prose-headings:text-copper-light prose-li:text-muted">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content || "…"}
+                        </ReactMarkdown>
+                      </article>
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {chatStreaming && (
+                <div className="flex items-center gap-2 text-xs text-copper-light">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Thinking…
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+          )}
         </div>
+
+        {/* Chat input bar — pinned to bottom */}
+        {chatOpen && (
+          <div className="border-t border-border px-6 py-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                sendChatMessage(chatInput);
+              }}
+              className="flex items-center gap-3"
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask a question about this company…"
+                className="flex-1 rounded-lg border border-border bg-surface-elevated px-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-copper-light focus:outline-none focus:ring-1 focus:ring-copper-light/50 transition-colors"
+                disabled={chatStreaming}
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || chatStreaming}
+                className="rounded-lg bg-copper-light/15 p-2.5 text-copper-light hover:bg-copper-light/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </>
   );

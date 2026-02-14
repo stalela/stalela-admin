@@ -11,6 +11,10 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Package,
+  Users,
+  Newspaper,
+  TrendingUp,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -59,6 +63,30 @@ function tabIdForHeading(h: string): string {
   if (lower.includes("email")) return "sales";
   if (lower.includes("call") || lower.includes("script")) return "sales";
   return "overview";
+}
+
+/** Get an icon for a specific section heading within a tab. */
+function iconForHeading(h: string): React.ReactNode {
+  const lower = h.toLowerCase();
+  if (lower.includes("overview") || lower.includes("company"))
+    return <Building2 className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("offering") || lower.includes("service"))
+    return <Package className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("people") || lower.includes("leadership"))
+    return <Users className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("web") || lower.includes("digital") || lower.includes("presence"))
+    return <Globe className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("news") || lower.includes("activity"))
+    return <Newspaper className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("pain") || lower.includes("challenge"))
+    return <AlertTriangle className="h-4 w-4 text-warning" />;
+  if (lower.includes("strategic") || lower.includes("trajectory") || lower.includes("growth"))
+    return <TrendingUp className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("email"))
+    return <Mail className="h-4 w-4 text-copper-light" />;
+  if (lower.includes("call") || lower.includes("script"))
+    return <Phone className="h-4 w-4 text-copper-light" />;
+  return <Building2 className="h-4 w-4 text-copper-light" />;
 }
 
 const TAB_META: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -126,7 +154,7 @@ function buildTabs(sections: ReportSection[]): Tab[] {
 const proseClasses =
   "prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2 prose-p:text-muted prose-p:leading-relaxed prose-li:text-muted prose-strong:text-foreground prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline prose-code:text-copper-light prose-code:bg-surface-elevated prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-surface-elevated prose-pre:border prose-pre:border-border";
 
-/** A single section card with heading, body, and optional copy button. */
+/** A single section card with heading icon, title, body, and optional copy button. */
 function SectionCard({
   section,
   showCopy,
@@ -143,11 +171,15 @@ function SectionCard({
   };
 
   return (
-    <div className="rounded-lg border border-border bg-surface-elevated/30 p-4">
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <h3 className="text-sm font-semibold text-foreground">
-          {section.heading}
-        </h3>
+    <div className="rounded-lg border border-border bg-surface-elevated/30">
+      {/* Section header */}
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          {iconForHeading(section.heading)}
+          <h3 className="text-sm font-semibold text-foreground">
+            {section.heading}
+          </h3>
+        </div>
         {showCopy && (
           <button
             onClick={handleCopy}
@@ -167,11 +199,14 @@ function SectionCard({
           </button>
         )}
       </div>
-      <article className={proseClasses}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {section.body}
-        </ReactMarkdown>
-      </article>
+      {/* Section body */}
+      <div className="px-4 py-3">
+        <article className={proseClasses}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {section.body}
+          </ReactMarkdown>
+        </article>
+      </div>
     </div>
   );
 }
@@ -203,11 +238,14 @@ function ChallengeCard({ section }: { section: ReportSection }) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface-elevated/30 p-4">
-      <h3 className="text-sm font-semibold text-foreground mb-3">
-        {section.heading}
-      </h3>
-      <div className="space-y-2">
+    <div className="rounded-lg border border-border bg-surface-elevated/30">
+      <div className="flex items-center gap-2.5 border-b border-border/60 px-4 py-3">
+        {iconForHeading(section.heading)}
+        <h3 className="text-sm font-semibold text-foreground">
+          {section.heading}
+        </h3>
+      </div>
+      <div className="px-4 py-3 space-y-2">
         {items.map((item, i) => (
           <div
             key={i}

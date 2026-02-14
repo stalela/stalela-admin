@@ -2,8 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { X, RefreshCw, Sparkles, Clock, Loader2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ReportView } from "@/components/ReportView";
 
 interface ResearchDrawerProps {
@@ -12,6 +10,15 @@ interface ResearchDrawerProps {
   open: boolean;
   onClose: () => void;
 }
+
+/** Streaming progress stages shown while the AI generates the report. */
+const PROGRESS_STAGES = [
+  { label: "Searching the web for company intelligence…", delay: 0 },
+  { label: "Analyzing digital presence & reviews…", delay: 8000 },
+  { label: "Identifying pain points & opportunities…", delay: 18000 },
+  { label: "Crafting personalized outreach…", delay: 30000 },
+  { label: "Finalizing your report…", delay: 45000 },
+];
 
 export function ResearchDrawer({
   companyId,
@@ -24,9 +31,42 @@ export function ResearchDrawer({
   const [cached, setCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [stageIndex, setStageIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const streamStartRef = useRef<number>(0);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgressAnimation = useCallback(() => {
+    streamStartRef.current = Date.now();
+    setStageIndex(0);
+    setProgress(0);
+
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - streamStartRef.current;
+      // Progress bar: asymptotic approach to 90% over 60s
+      const pct = Math.min(90, (elapsed / 60000) * 100);
+      setProgress(pct);
+
+      // Advance stage
+      for (let i = PROGRESS_STAGES.length - 1; i >= 0; i--) {
+        if (elapsed >= PROGRESS_STAGES[i].delay) {
+          setStageIndex(i);
+          break;
+        }
+      }
+    }, 200);
+  }, []);
+
+  const stopProgressAnimation = useCallback(() => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setProgress(100);
+  }, []);
 
   const fetchReport = useCallback(
     async (force = false) => {
@@ -63,11 +103,11 @@ export function ResearchDrawer({
           setCached(true);
           setCachedAt(data.created_at);
           setStreaming(false);
-          setHasLoaded(true);
           return;
         }
 
-        // Streaming SSE response
+        // Streaming SSE response — collect silently, show progress animation
+        startProgressAnimation();
         const reader = res.body!.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -91,7 +131,6 @@ export function ResearchDrawer({
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 accumulated += parsed.content;
-                setReport(accumulated);
               }
             } catch {
               // Skip malformed chunks
@@ -99,8 +138,10 @@ export function ResearchDrawer({
           }
         }
 
-        setHasLoaded(true);
+        stopProgressAnimation();
+        setReport(accumulated);
       } catch (e) {
+        stopProgressAnimation();
         if (e instanceof DOMException && e.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Failed to generate report");
       } finally {
@@ -108,27 +149,29 @@ export function ResearchDrawer({
         abortRef.current = null;
       }
     },
-    [companyId]
+    [companyId, startProgressAnimation, stopProgressAnimation]
   );
 
-  // Auto-fetch on first open
+  // Auto-fetch on open when no report is loaded
   useEffect(() => {
-    if (open && !hasLoaded && !streaming) {
+    if (open && !report && !streaming && !error) {
       fetchReport(false);
     }
-  }, [open, hasLoaded, streaming, fetchReport]);
+  }, [open, report, streaming, error, fetchReport]);
 
-  // Auto-scroll while streaming
+  // Reset state when companyId changes
   useEffect(() => {
-    if (streaming && contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
-    }
-  }, [report, streaming]);
+    setReport("");
+    setCached(false);
+    setCachedAt(null);
+    setError(null);
+  }, [companyId]);
 
   // Abort on close/unmount
   useEffect(() => {
     return () => {
       if (abortRef.current) abortRef.current.abort();
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
   }, []);
 
@@ -173,7 +216,7 @@ export function ResearchDrawer({
             {streaming && (
               <span className="flex items-center gap-1.5 text-xs text-copper-light">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Researching…
+                Generating…
               </span>
             )}
             {cached && cachedAt && (
@@ -182,7 +225,7 @@ export function ResearchDrawer({
                 {new Date(cachedAt).toLocaleDateString()}
               </span>
             )}
-            {hasLoaded && !streaming && (
+            {report && !streaming && (
               <button
                 onClick={() => fetchReport(true)}
                 className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"
@@ -217,23 +260,42 @@ export function ResearchDrawer({
             </div>
           )}
 
-          {!report && !error && streaming && (
-            <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+          {/* Progress animation while streaming (report hidden) */}
+          {streaming && (
+            <div className="flex flex-col items-center justify-center gap-6 py-16">
               <div className="relative">
-                <Sparkles className="h-8 w-8 text-copper-light animate-pulse" />
+                <div className="absolute inset-0 rounded-full bg-copper-light/20 animate-ping" />
+                <div className="relative rounded-full bg-surface-elevated p-4">
+                  <Sparkles className="h-8 w-8 text-copper-light" />
+                </div>
               </div>
-              <div>
+
+              <div className="text-center">
                 <p className="text-sm font-medium text-foreground">
-                  Researching {companyName}…
+                  Preparing report for {companyName}
                 </p>
-                <p className="mt-1 text-xs text-muted">
-                  Searching the web for current intelligence. This may take 30-60 seconds.
+                <p className="mt-2 text-xs text-muted transition-all duration-500">
+                  {PROGRESS_STAGES[stageIndex].label}
+                </p>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full max-w-xs">
+                <div className="h-1.5 w-full rounded-full bg-surface-elevated overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-copper-600 to-copper-light transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-center text-xs text-muted">
+                  {Math.round(progress)}%
                 </p>
               </div>
             </div>
           )}
 
-          {!report && !error && !streaming && !hasLoaded && (
+          {/* Empty state — no report yet, not streaming */}
+          {!report && !error && !streaming && (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
               <Sparkles className="h-8 w-8 text-muted" />
               <p className="text-sm text-muted">
@@ -242,15 +304,7 @@ export function ResearchDrawer({
             </div>
           )}
 
-          {report && streaming && (
-            <article className="prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-h2:text-base prose-h2:border-b prose-h2:border-border prose-h2:pb-2 prose-h2:mt-6 prose-h2:mb-3 prose-p:text-muted prose-p:leading-relaxed prose-li:text-muted prose-strong:text-foreground prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline prose-code:text-copper-light prose-code:bg-surface-elevated prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-surface-elevated prose-pre:border prose-pre:border-border">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {report}
-              </ReactMarkdown>
-              <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-copper-light ml-0.5" />
-            </article>
-          )}
-
+          {/* Completed report — tabbed view */}
           {report && !streaming && (
             <ReportView markdown={report} />
           )}

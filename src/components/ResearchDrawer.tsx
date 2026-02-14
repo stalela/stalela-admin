@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { X, RefreshCw, Sparkles, Clock, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ReportView } from "@/components/ReportView";
 
 interface ResearchDrawerProps {
   companyId: string;
@@ -241,15 +242,17 @@ export function ResearchDrawer({
             </div>
           )}
 
-          {report && (
+          {report && streaming && (
             <article className="prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-h2:text-base prose-h2:border-b prose-h2:border-border prose-h2:pb-2 prose-h2:mt-6 prose-h2:mb-3 prose-p:text-muted prose-p:leading-relaxed prose-li:text-muted prose-strong:text-foreground prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline prose-code:text-copper-light prose-code:bg-surface-elevated prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-surface-elevated prose-pre:border prose-pre:border-border">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {report}
               </ReactMarkdown>
-              {streaming && (
-                <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-copper-light ml-0.5" />
-              )}
+              <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-copper-light ml-0.5" />
             </article>
+          )}
+
+          {report && !streaming && (
+            <ReportView markdown={report} />
           )}
         </div>
       </div>

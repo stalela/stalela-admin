@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Send,
   ArrowLeft,
+  Database,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -476,16 +477,26 @@ export function ResearchDrawer({
             <div className="flex flex-col gap-4">
               {chatMessages.length === 0 && (
                 <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                  <MessageSquare className="h-8 w-8 text-muted" />
-                  <p className="text-sm text-muted">
-                    Ask anything about {companyName}
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2 mt-2">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-7 w-7 text-muted" />
+                    <Database className="h-5 w-5 text-muted" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-foreground font-medium">
+                      Ask anything about {companyName}
+                    </p>
+                    <p className="text-xs text-muted mt-1">
+                      I can search our database, find nearby businesses, and browse the web
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 mt-3">
                     {[
-                      "What are their biggest pain points?",
-                      "Draft a follow-up email",
-                      "Summarize their digital presence",
-                      "What products do we offer that fit?",
+                      "List the 10 closest businesses",
+                      "Find similar companies in Cape Town",
+                      "Draft a cold email for this company",
+                      "What competitors are nearby?",
+                      "How many businesses are in this province?",
+                      "Who are the key decision makers?",
                     ].map((q) => (
                       <button
                         key={q}
@@ -527,9 +538,9 @@ export function ResearchDrawer({
               ))}
 
               {chatStreaming && (
-                <div className="flex items-center gap-2 text-xs text-copper-light">
+                <div className="flex items-center gap-2 rounded-lg bg-surface-elevated px-3 py-2 text-xs text-copper-light">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Thinking…
+                  <span>Searching databases &amp; analyzing…</span>
                 </div>
               )}
 
@@ -552,7 +563,7 @@ export function ResearchDrawer({
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask a question about this company…"
+                placeholder="Search nearby businesses, ask about competitors, draft emails…"
                 className="flex-1 rounded-lg border border-border bg-surface-elevated px-4 py-2.5 text-sm text-foreground placeholder:text-muted focus:border-copper-light focus:outline-none focus:ring-1 focus:ring-copper-light/50 transition-colors"
                 disabled={chatStreaming}
               />

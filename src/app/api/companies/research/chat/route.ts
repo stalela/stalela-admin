@@ -421,26 +421,61 @@ export async function POST(request: NextRequest) {
     while (round < MAX_TOOL_ROUNDS) {
       round++;
 
+      const requestBody: Record<string, unknown> = {
+          model: "qwen3-max",
+          messages,
+          tools: TOOLS,
+          enable_thinking: false,
+        };
+
+      console.log(
+        "[chat] Round", round,
+        "| messages:", messages.length,
+        "| last role:", messages[messages.length - 1]?.role
+      );
+
       const response = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
         },
-        body: JSON.stringify({
-          model: "qwen3-max",
-          messages,
-          tools: TOOLS,
-          tool_choice: "auto",
-          enable_search: true,
-          search_options: { search_strategy: "agent" },
-          enable_thinking: false,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errText = await response.text();
         console.error("[chat] DashScope error:", response.status, errText);
+
+        // If tool-calling fails, retry without tools as fallback
+        if (round === 1) {
+          console.log("[chat] Retrying without tools…");
+          const fallbackRes = await fetch(
+            `${DASHSCOPE_BASE_URL}/chat/completions`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: "qwen3-max",
+                messages,
+                enable_search: true,
+                search_options: { search_strategy: "agent" },
+                enable_thinking: false,
+              }),
+            }
+          );
+
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            finalContent =
+              fallbackData.choices?.[0]?.message?.content || "No response.";
+            break;
+          }
+        }
+
         return NextResponse.json(
           { error: `AI service error: ${response.status}` },
           { status: 502 }

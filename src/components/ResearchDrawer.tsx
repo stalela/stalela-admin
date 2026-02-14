@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { X, RefreshCw, Sparkles, Clock, Loader2 } from "lucide-react";
+import { X, RefreshCw, Sparkles, Clock, Loader2, Mail } from "lucide-react";
 import { ReportView } from "@/components/ReportView";
 
 interface ResearchDrawerProps {
@@ -226,13 +226,31 @@ export function ResearchDrawer({
               </span>
             )}
             {report && !streaming && (
-              <button
-                onClick={() => fetchReport(true)}
-                className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"
-                title="Regenerate report"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    const subject = encodeURIComponent(
+                      `AI Research Report — ${companyName}`
+                    );
+                    const body = encodeURIComponent(report);
+                    window.open(
+                      `https://mail.google.com/mail/?view=cm&su=${subject}&body=${body}`,
+                      "_blank"
+                    );
+                  }}
+                  className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"
+                  title="Send report via Gmail"
+                >
+                  <Mail className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => fetchReport(true)}
+                  className="rounded-md p-1.5 text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"
+                  title="Regenerate report"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+              </>
             )}
             <button
               onClick={onClose}

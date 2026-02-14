@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+:root {
+  /* ── Wakanda palette ─────────────────────────────────────────
+     Dark, futuristic base with copper/gold accents.
+     Inspired by vibranium tech meets South African heritage. */
+
+  --background: #0a0a0c;
+  --foreground: #e8e4df;
+  --surface: #121217;
+  --surface-elevated: #1a1a22;
+  --surface-hover: #22222d;
+  --border: #2a2a38;
+  --border-bright: #3a3a4d;
+  --muted: #6b6b80;
+
+  /* Brand copper — same hex values as marketing site */
+  --copper: #a4785a;
+  --copper-light: #d4a574;
+  --copper-50: #faf5f0;
+  --copper-100: #f0e4d6;
+  --copper-200: #e0c9ad;
+  --copper-600: #a4785a;
+  --copper-700: #8a6349;
+  --copper-800: #6e4f3a;
+
+  /* Wakanda accent glow — vibranium purple + copper */
+  --glow: rgba(164, 120, 90, 0.15);
+  --glow-strong: rgba(164, 120, 90, 0.3);
+  --vibranium: #7c5cff;
+  --vibranium-dim: rgba(124, 92, 255, 0.1);
+  --vibranium-glow: rgba(124, 92, 255, 0.25);
+
+  /* Status colours */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+
+  --charcoal: #1c1c1c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-bright: var(--border-bright);
+  --color-muted: var(--muted);
+
+  --color-copper-50: var(--copper-50);
+  --color-copper-100: var(--copper-100);
+  --color-copper-200: var(--copper-200);
+  --color-copper-600: var(--copper-600);
+  --color-copper-700: var(--copper-700);
+  --color-copper-800: var(--copper-800);
+  --color-copper-light: var(--copper-light);
+
+  --color-glow: var(--glow);
+  --color-glow-strong: var(--glow-strong);
+  --color-vibranium: var(--vibranium);
+  --color-vibranium-dim: var(--vibranium-dim);
+  --color-vibranium-glow: var(--vibranium-glow);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ── Base resets ───────────────────────────────────────────── */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* ── Wakanda geometric decorations ──────────────────────────── */
+.wakanda-lines {
+  background-image:
+    linear-gradient(135deg, var(--glow) 1px, transparent 1px),
+    linear-gradient(225deg, var(--vibranium-dim) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.wakanda-glow {
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 0 20px -5px var(--glow-strong),
+    0 0 40px -10px var(--vibranium-glow);
+}
+
+.wakanda-border {
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.wakanda-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    var(--copper-600) 0%,
+    transparent 40%,
+    transparent 60%,
+    var(--vibranium) 100%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--copper-600);
+}
+
+/* ── Selection ─────────────────────────────────────────────── */
+::selection {
+  background: var(--copper-600);
+  color: #fff;
+}

@@ -152,7 +152,41 @@ function buildTabs(sections: ReportSection[]): Tab[] {
 /* ------------------------------------------------------------------ */
 
 const proseClasses =
-  "prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2 prose-p:text-muted prose-p:leading-relaxed prose-li:text-muted prose-strong:text-foreground prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline prose-code:text-copper-light prose-code:bg-surface-elevated prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-surface-elevated prose-pre:border prose-pre:border-border";
+  "prose prose-invert prose-sm max-w-none prose-headings:text-copper-light prose-headings:font-semibold prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-2 prose-p:text-muted prose-p:leading-relaxed prose-li:text-muted prose-strong:text-copper-light prose-a:text-copper-light prose-a:underline hover:prose-a:text-foreground prose-code:text-copper-light prose-code:bg-surface-elevated prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-surface-elevated prose-pre:border prose-pre:border-border";
+
+/** Custom markdown component overrides to make links open in new tabs. */
+const markdownComponents = {
+  a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+};
+
+/**
+ * Pre-process markdown text to wrap bare URLs / domains in proper links.
+ * Matches URLs with protocol, bare domains (word.tld), and @handles.
+ * Skips anything already inside []() or <> markdown link syntax.
+ */
+function linkifyText(text: string): string {
+  // Already-linked markdown: [text](url) — skip those
+  // 1. Bare URLs with protocol
+  let result = text.replace(
+    /(?<!\]\()(?<!<)(https?:\/\/[^\s)\]>]+)/gi,
+    (m) => `[${m}](${m})`
+  );
+  // 2. Bare domains like example.co.za, natu.org.za (not already linked)
+  result = result.replace(
+    /(?<![\/\/\]\(])\b([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:com|co\.za|org\.za|org|net|io|co|za|africa|dev|app|tech|info|biz|me)(?:\/[^\s)]*)?)\b/gi,
+    (m) => `[${m}](https://${m})`
+  );
+  return result;
+}
 
 /** A single section card with heading icon, title, body, and optional copy button. */
 function SectionCard({
@@ -202,8 +236,8 @@ function SectionCard({
       {/* Section body */}
       <div className="px-4 py-3">
         <article className={proseClasses}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {section.body}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {linkifyText(section.body)}
           </ReactMarkdown>
         </article>
       </div>
@@ -334,8 +368,8 @@ function SalesCard({ section }: { section: ReportSection }) {
 
       {expanded && (
         <article className={proseClasses}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {section.body}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {linkifyText(section.body)}
           </ReactMarkdown>
         </article>
       )}
@@ -369,7 +403,7 @@ export function ReportView({ markdown }: ReportViewProps) {
     // Fallback: raw markdown if no sections detected
     return (
       <article className={proseClasses}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{linkifyText(markdown)}</ReactMarkdown>
       </article>
     );
   }

@@ -60,7 +60,7 @@ export function MiniMap({ latitude, longitude, name }: MiniMapProps) {
   return (
     <div
       ref={mapRef}
-      className="h-64 w-full rounded-lg overflow-hidden border border-border"
+      className="h-64 w-full rounded-lg overflow-hidden border border-border isolate"
     />
   );
 }

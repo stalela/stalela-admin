@@ -532,10 +532,39 @@ export async function POST(request: NextRequest) {
       break;
     }
 
-    // If we exhausted rounds without a final answer
-    if (!finalContent && round >= MAX_TOOL_ROUNDS) {
-      finalContent =
-        "I gathered a lot of data but ran out of processing rounds. Here's what I found so far — please ask a more specific question if you need more detail.";
+    // If we exhausted tool rounds, make one final call WITHOUT tools to force a text answer
+    if (!finalContent) {
+      console.log("[chat] Exhausted tool rounds, forcing final answer…");
+
+      // Add an instruction to summarize
+      messages.push({
+        role: "user",
+        content:
+          "Please summarize all the data you've gathered and provide your final answer now. Do not call any more tools.",
+      });
+
+      const finalRes = await fetch(`${DASHSCOPE_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "qwen3-max",
+          messages,
+          enable_thinking: false,
+        }),
+      });
+
+      if (finalRes.ok) {
+        const finalData = await finalRes.json();
+        finalContent =
+          finalData.choices?.[0]?.message?.content ||
+          "Sorry, I could not generate a response. Please try a more specific question.";
+      } else {
+        finalContent =
+          "Sorry, I collected data but could not generate a final response. Please try again.";
+      }
     }
 
     // Stream the final response back to the client

@@ -1,0 +1,38 @@
+name: Daily Outreach Briefing
+
+on:
+  schedule:
+    # 06:00 UTC = 08:00 CAT (Central Africa Time, UTC+2)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Number of companies to include in the briefing'
+        required: false
+        default: '10'
+
+jobs:
+  generate-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run daily briefing generator
+        run: npx tsx scripts/daily-briefing.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          BRIEFING_BATCH_SIZE: ${{ inputs.batch_size || '10' }}

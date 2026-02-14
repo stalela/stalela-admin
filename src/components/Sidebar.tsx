@@ -17,6 +17,7 @@ import {
   MapPin,
   Network,
   List,
+  Newspaper,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -55,6 +56,7 @@ const navigation: (NavItem | NavGroup)[] = [
     ],
   },
   { label: "Metrics", href: "/metrics", icon: BarChart3 },
+  { label: "Briefings", href: "/briefings", icon: Newspaper },
   {
     label: "Companies",
     icon: Building2,

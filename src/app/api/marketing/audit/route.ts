@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auditsApi } from "@/lib/api";
+import { auditsApi, competitorsApi } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -262,6 +262,32 @@ export async function POST(request: NextRequest) {
             status: "complete",
             report,
           });
+
+          // Auto-discover competitors from audit signals
+          if (Array.isArray(report.competitor_signals) && report.competitor_signals.length > 0) {
+            sendEvent({ status: "Discovering competitors..." });
+            try {
+              const existing = await competitorsApi.list(tenant_id);
+              const existingNames = new Set(existing.map((c: { name: string }) => c.name.toLowerCase()));
+
+              for (const signal of report.competitor_signals.slice(0, 5)) {
+                if (!signal.name || existingNames.has(signal.name.toLowerCase())) continue;
+                try {
+                  await competitorsApi.create({
+                    tenant_id,
+                    name: signal.name,
+                    website: signal.website || null,
+                    notes: signal.notes || null,
+                    discovered_via: "ai_audit",
+                  });
+                } catch {
+                  // skip individual failures
+                }
+              }
+            } catch {
+              // non-critical — don't fail the audit
+            }
+          }
 
           sendEvent({
             status: "Your audit is ready!",

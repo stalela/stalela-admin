@@ -23,6 +23,7 @@ import {
   Globe,
   Zap,
   Plug,
+  Swords,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -81,6 +82,7 @@ const adminNavigation: (NavItem | NavGroup)[] = [
       { label: "Overview", href: "/marketing", icon: Megaphone },
       { label: "Tenants", href: "/marketing/tenants", icon: Users },
       { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
+      { label: "Competitors", href: "/marketing/competitors", icon: Swords },
       { label: "Audit", href: "/marketing/onboarding", icon: Zap },
     ],
   },
@@ -91,6 +93,7 @@ const tenantNavigation: (NavItem | NavGroup)[] = [
   { label: "Dashboard", href: "/marketing", icon: LayoutDashboard },
   { label: "Website Audit", href: "/marketing/onboarding", icon: Globe },
   { label: "Connections", href: "/marketing/connections", icon: Plug },
+  { label: "Competitors", href: "/marketing/competitors", icon: Swords },
   { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
 ];
 

@@ -420,46 +420,70 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
               <div
                 key={i}
                 className={cn(
-                  "flex",
+                  "flex gap-3",
                   msg.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
+                {/* Avatar */}
+                {msg.role === "assistant" && (
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-copper-600/10 mt-1">
+                    <Bot className="h-4 w-4 text-copper-600" />
+                  </div>
+                )}
+
                 <div
                   className={cn(
-                    "max-w-[80%] rounded-xl px-4 py-3 text-sm",
+                    "max-w-[85%] rounded-xl text-sm",
                     msg.role === "user"
-                      ? "bg-copper-600 text-white"
-                      : "bg-surface-elevated border border-border text-foreground"
+                      ? "bg-copper-600 text-white px-4 py-3"
+                      : "bg-surface-elevated border border-border text-foreground px-5 py-4"
                   )}
                 >
                   {msg.role === "assistant" ? (
                     msg.content ? (
                       <div
-                        className="prose prose-invert prose-sm max-w-none
+                        className="chat-markdown prose prose-invert prose-sm max-w-none
                           prose-headings:text-foreground prose-headings:font-semibold
-                          prose-h1:text-base prose-h1:mb-2
-                          prose-h2:text-sm prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-copper-light
-                          prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1 prose-h3:text-copper-light
+                          prose-h1:text-base prose-h1:mb-3 prose-h1:mt-0
+                          prose-h2:text-[0.9rem] prose-h2:mt-5 prose-h2:mb-2 prose-h2:text-copper-light prose-h2:flex prose-h2:items-center prose-h2:gap-2
+                          prose-h3:text-sm prose-h3:mt-4 prose-h3:mb-1.5 prose-h3:text-copper-light
                           prose-p:text-muted prose-p:leading-relaxed prose-p:my-1.5
-                          prose-li:text-muted prose-li:leading-relaxed
-                          prose-strong:text-foreground
+                          prose-li:text-muted prose-li:leading-relaxed prose-li:my-0.5
+                          prose-strong:text-foreground prose-strong:font-semibold
                           prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline
-                          prose-table:text-sm
-                          prose-th:text-foreground prose-th:font-medium prose-th:px-2 prose-th:py-1
-                          prose-td:text-muted prose-td:px-2 prose-td:py-1
-                          prose-code:text-copper-light prose-code:bg-background prose-code:px-1 prose-code:rounded"
+                          prose-blockquote:border-l-2 prose-blockquote:border-copper-600 prose-blockquote:bg-copper-600/5 prose-blockquote:rounded-r-lg prose-blockquote:px-4 prose-blockquote:py-2 prose-blockquote:my-3 prose-blockquote:not-italic prose-blockquote:text-foreground
+                          prose-table:text-sm prose-table:w-full
+                          prose-thead:border-b prose-thead:border-border
+                          prose-th:text-foreground prose-th:font-semibold prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:bg-surface/50
+                          prose-td:text-muted prose-td:px-3 prose-td:py-2 prose-td:border-b prose-td:border-border/50
+                          prose-tr:transition-colors hover:prose-tr:bg-surface/30
+                          prose-code:text-copper-light prose-code:bg-background prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono
+                          prose-hr:border-border prose-hr:my-4
+                          prose-ol:list-decimal prose-ol:pl-4 prose-ol:my-2
+                          prose-ul:list-disc prose-ul:pl-4 prose-ul:my-2"
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                       />
                     ) : (
-                      <div className="flex items-center gap-2 text-muted">
-                        <Loader2 className="h-4 w-4 animate-spin text-copper-600" />
-                        <span className="text-sm">Thinking…</span>
+                      <div className="flex items-center gap-3 text-muted py-1">
+                        <div className="flex gap-1">
+                          <span className="h-2 w-2 rounded-full bg-copper-600 animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="h-2 w-2 rounded-full bg-copper-600 animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="h-2 w-2 rounded-full bg-copper-600 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                        <span className="text-sm">Analyzing data…</span>
                       </div>
                     )
                   ) : (
                     <span className="whitespace-pre-wrap">{msg.content}</span>
                   )}
                 </div>
+
+                {/* User avatar */}
+                {msg.role === "user" && (
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-copper-600 mt-1">
+                    <span className="text-xs font-bold text-white">You</span>
+                  </div>
+                )}
               </div>
             ))}
             <div ref={chatEndRef} />
@@ -480,7 +504,7 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                 }}
                 placeholder="Ask about briefings, metrics, leads, companies…"
                 rows={1}
-                className="flex-1 resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none"
+                className="flex-1 resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600/30"
                 style={{ maxHeight: "120px" }}
               />
               <button
@@ -793,26 +817,58 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
 /* ── Markdown renderer ──────────────────────────────────────── */
 
 function renderMarkdown(md: string): string {
-  return md
-    // Headers
+  let html = md;
+
+  // Tables: detect markdown tables and convert to HTML
+  html = html.replace(
+    /^(\|.+\|)\n(\|[\s-:|]+\|)\n((\|.+\|\n?)+)/gm,
+    (_match, headerRow: string, _sep: string, bodyBlock: string) => {
+      const headers = headerRow.split("|").filter((c: string) => c.trim()).map((c: string) => c.trim());
+      const rows = bodyBlock.trim().split("\n").map((row: string) =>
+        row.split("|").filter((c: string) => c.trim()).map((c: string) => c.trim())
+      );
+      const ths = headers.map((h: string) => `<th>${h}</th>`).join("");
+      const trs = rows.map((cols: string[]) => `<tr>${cols.map((c: string) => `<td>${c}</td>`).join("")}</tr>`).join("");
+      return `<div class="table-wrap"><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
+    }
+  );
+
+  html = html
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr />')
+    // Headers (with optional emoji/icon prefix)
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    // Blockquotes
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     // Links (BEFORE bold, so [**text**](url) works)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Italic
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
     // Bare URLs (not already inside an href)
     .replace(/(?<!href=")(?<!href=')(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+    // Numbered list items
+    .replace(/^\d+\.\s+(.+)$/gm, '<li class="numbered">$1</li>')
     // Unordered list items
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    // Wrap consecutive <li> in <ul>
+    .replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>')
+    // Wrap consecutive <li class="numbered"> in <ol>
+    .replace(/((?:<li class="numbered">.*<\/li>\n?)+)/g, (m) =>
+      `<ol>${m.replace(/ class="numbered"/g, "")}</ol>`
+    )
+    // Wrap consecutive <li> (unordered) in <ul>
     .replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
+    // Merge consecutive blockquotes
+    .replace(/<\/blockquote>\n<blockquote>/g, '<br />')
     // Line breaks for remaining text
     .replace(/\n\n/g, '</p><p>')
-    .replace(/^(?!<[hup]|<li|<ul)(.*\S.*)$/gm, '<p>$1</p>');
+    .replace(/^(?!<[hupob]|<li|<ul|<ol|<div|<ta|<hr)(.*\S.*)$/gm, '<p>$1</p>');
+
+  return html;
 }
 
 /* ── Small action button ────────────────────────────────────── */

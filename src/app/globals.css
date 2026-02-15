@@ -118,6 +118,39 @@ body {
   pointer-events: none;
 }
 
+/* ── Chat markdown styling ──────────────────────────────────── */
+.chat-markdown .table-wrap {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+.chat-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.chat-markdown blockquote {
+  margin: 0.75rem 0;
+}
+.chat-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+.chat-markdown ol {
+  counter-reset: item;
+}
+.chat-markdown ol li {
+  counter-increment: item;
+}
+.chat-markdown ol li::marker {
+  color: var(--copper-600);
+  font-weight: 600;
+}
+.chat-markdown ul li::marker {
+  color: var(--copper-600);
+}
+
 /* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;

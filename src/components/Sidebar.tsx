@@ -24,6 +24,7 @@ import {
   Zap,
   Plug,
   Swords,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -95,6 +96,7 @@ const tenantNavigation: (NavItem | NavGroup)[] = [
   { label: "Connections", href: "/marketing/connections", icon: Plug },
   { label: "Competitors", href: "/marketing/competitors", icon: Swords },
   { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
+  { label: "Chat History", href: "/marketing/chat", icon: MessageSquare },
 ];
 
 function getNavigation(role: UserRole): (NavItem | NavGroup)[] {

@@ -1,7 +1,8 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { createClient } from "@/lib/supabase-server";
-import { getTenantContext } from "@/lib/tenant-context";
+import { getTenantContext, isTenantUser } from "@/lib/tenant-context";
+import MarketingChat from "@/components/MarketingChat";
 
 export default async function DashboardLayout({
   children,
@@ -12,6 +13,8 @@ export default async function DashboardLayout({
   let userEmail = "";
   let userName = "";
   let avatarUrl = "";
+  let userId = "";
+  let tenantId = "";
 
   try {
     const supabase = await createClient();
@@ -23,10 +26,14 @@ export default async function DashboardLayout({
       userEmail = user.email || "";
       userName = user.user_metadata?.full_name || user.user_metadata?.name || "";
       avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || "";
+      userId = user.id;
+      tenantId = ctx.tenantId || "";
     }
   } catch {
     // Fallback to admin if resolution fails
   }
+
+  const showChat = isTenantUser(userRole) && !!tenantId && !!userId;
 
   return (
     <div className="min-h-screen bg-background">
@@ -35,6 +42,7 @@ export default async function DashboardLayout({
         <Header userEmail={userEmail} userName={userName} userRole={userRole} avatarUrl={avatarUrl} />
         <main className="p-6">{children}</main>
       </div>
+      {showChat && <MarketingChat tenantId={tenantId} userId={userId} />}
     </div>
   );
 }

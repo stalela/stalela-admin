@@ -286,6 +286,13 @@ export default function OnboardingWizard({ tenantId, tenantName }: OnboardingPro
                 )}
               </button>
             ))}
+            <p className="text-center text-xs text-muted">
+              You can connect your ad accounts in{" "}
+              <a href="/marketing/connections" className="text-copper-light hover:underline">
+                Platform Connections
+              </a>{" "}
+              after completing the audit.
+            </p>
           </div>
 
           <div className="flex items-center justify-between">

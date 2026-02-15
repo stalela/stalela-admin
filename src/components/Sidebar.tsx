@@ -22,6 +22,7 @@ import {
   Target,
   Globe,
   Zap,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -89,6 +90,7 @@ const adminNavigation: (NavItem | NavGroup)[] = [
 const tenantNavigation: (NavItem | NavGroup)[] = [
   { label: "Dashboard", href: "/marketing", icon: LayoutDashboard },
   { label: "Website Audit", href: "/marketing/onboarding", icon: Globe },
+  { label: "Connections", href: "/marketing/connections", icon: Plug },
   { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
 ];
 

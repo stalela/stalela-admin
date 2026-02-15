@@ -150,6 +150,18 @@ export default function LoginPage() {
               </div>
             )}
 
+            {!isSignUp && (
+              <div className="text-right -mt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/login/forgot-password")}
+                  className="text-xs text-muted hover:text-copper-600 transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -175,6 +187,25 @@ export default function LoginPage() {
                   ? "Already have an account? Sign in"
                   : "Need to create first admin account? Sign up"
                 }
+              </button>
+            </div>
+
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-surface px-2 text-muted">or</span>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => router.push("/signup")}
+                className="text-sm text-copper-light hover:text-copper-600 transition-colors font-medium"
+              >
+                Sign up for Stalela Marketing →
               </button>
             </div>
           </form>

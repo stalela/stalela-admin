@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { UserRole } from "@/lib/tenant-context";
 
 interface NavItem {
   label: string;
@@ -38,7 +39,8 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const navigation: (NavItem | NavGroup)[] = [
+/** Full navigation for internal admins */
+const adminNavigation: (NavItem | NavGroup)[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   {
     label: "Blog",
@@ -79,6 +81,17 @@ const navigation: (NavItem | NavGroup)[] = [
     ],
   },
 ];
+
+/** Navigation for tenant users (marketing only, no Tenants admin) */
+const tenantNavigation: (NavItem | NavGroup)[] = [
+  { label: "Dashboard", href: "/marketing", icon: LayoutDashboard },
+  { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
+];
+
+function getNavigation(role: UserRole): (NavItem | NavGroup)[] {
+  if (role === "internal_admin") return adminNavigation;
+  return tenantNavigation;
+}
 
 function isGroup(item: NavItem | NavGroup): item is NavGroup {
   return "items" in item;
@@ -158,8 +171,10 @@ function NavGroupSection({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ userRole = "internal_admin" }: { userRole?: UserRole }) {
   const router = useRouter();
+  const navigation = getNavigation(userRole);
+  const isTenant = userRole !== "internal_admin";
 
   async function handleLogout() {
     const supabase = createClient();
@@ -183,7 +198,7 @@ export function Sidebar() {
             STALELA
           </h1>
           <p className="text-[10px] uppercase tracking-[0.25em] text-muted">
-            Command Centre
+            {isTenant ? "Marketing" : "Command Centre"}
           </p>
         </div>
       </div>

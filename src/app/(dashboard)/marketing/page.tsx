@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Megaphone, Users, Target, BarChart3, ArrowUpRight, Plus } from "lucide-react";
 import { tenantsApi, campaignsApi } from "@/lib/api";
+import { createClient } from "@/lib/supabase-server";
+import { getTenantContext, isTenantUser } from "@/lib/tenant-context";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
@@ -10,22 +12,47 @@ import type { Tenant } from "@stalela/commons/types";
 export const dynamic = "force-dynamic";
 
 export default async function MarketingPage() {
-  const { tenants, total: totalTenants } = await tenantsApi.list({ limit: 5 });
+  // Resolve user context to determine scope
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const ctx = user ? await getTenantContext(user.id) : null;
+  const isTenant = ctx ? isTenantUser(ctx.role) : false;
 
-  // Gather campaign counts per tenant (for the top-level overview)
+  let tenants: Tenant[] = [];
+  let totalTenants = 0;
   let totalCampaigns = 0;
   let activeCampaigns = 0;
-  for (const t of tenants) {
+
+  if (isTenant && ctx?.tenantId) {
+    // Tenant user: show only their own tenant
+    const tenant = await tenantsApi.getById(ctx.tenantId);
+    if (tenant) {
+      tenants = [tenant];
+      totalTenants = 1;
+    }
     try {
-      const { total } = await campaignsApi.list(t.id, { limit: 1 });
-      totalCampaigns += total;
-      const { total: active } = await campaignsApi.list(t.id, {
-        status: "active",
-        limit: 1,
-      });
-      activeCampaigns += active;
+      const { total } = await campaignsApi.list(ctx.tenantId, { limit: 1 });
+      totalCampaigns = total;
+      const { total: active } = await campaignsApi.list(ctx.tenantId, { status: "active", limit: 1 });
+      activeCampaigns = active;
     } catch {
       // skip
+    }
+  } else {
+    // Admin: show all tenants
+    const result = await tenantsApi.list({ limit: 5 });
+    tenants = result.tenants;
+    totalTenants = result.total;
+
+    for (const t of tenants) {
+      try {
+        const { total } = await campaignsApi.list(t.id, { limit: 1 });
+        totalCampaigns += total;
+        const { total: active } = await campaignsApi.list(t.id, { status: "active", limit: 1 });
+        activeCampaigns += active;
+      } catch {
+        // skip
+      }
     }
   }
 
@@ -34,18 +61,28 @@ export default async function MarketingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">
-            Lalela Marketing
+            {isTenant ? "My Dashboard" : "Stalela Marketing"}
           </h1>
           <p className="text-sm text-muted">
             AI-powered ad management platform
           </p>
         </div>
-        <Link href="/marketing/tenants/new">
-          <Button>
-            <Plus className="h-4 w-4" />
-            New Tenant
-          </Button>
-        </Link>
+        {!isTenant && (
+          <Link href="/marketing/tenants/new">
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Tenant
+            </Button>
+          </Link>
+        )}
+        {isTenant && ctx?.tenantId && (
+          <Link href={`/marketing/campaigns/new?tenant_id=${ctx.tenantId}`}>
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Campaign
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Stats */}

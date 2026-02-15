@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Plus } from "lucide-react";
 import { tenantsApi, campaignsApi } from "@/lib/api";
+import { createClient } from "@/lib/supabase-server";
+import { getTenantContext, isTenantUser } from "@/lib/tenant-context";
 import { Badge } from "@/components/Badge";
+import { Button } from "@/components/Button";
 import { DataTable } from "@/components/DataTable";
 import type { Campaign } from "@stalela/commons/types";
 
@@ -16,16 +19,28 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "default"
 };
 
 export default async function AllCampaignsPage() {
-  // Aggregate campaigns across all tenants
-  const { tenants } = await tenantsApi.list({ limit: 100 });
+  // Resolve user context
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const ctx = user ? await getTenantContext(user.id) : null;
+  const isTenant = ctx ? isTenantUser(ctx.role) : false;
+
   const allCampaigns: Campaign[] = [];
 
-  for (const t of tenants) {
-    try {
-      const { campaigns } = await campaignsApi.list(t.id, { limit: 100 });
-      allCampaigns.push(...campaigns);
-    } catch {
-      // skip
+  if (isTenant && ctx?.tenantId) {
+    // Tenant user: show only their campaigns
+    const { campaigns } = await campaignsApi.list(ctx.tenantId, { limit: 100 });
+    allCampaigns.push(...campaigns);
+  } else {
+    // Admin: aggregate across all tenants
+    const { tenants } = await tenantsApi.list({ limit: 100 });
+    for (const t of tenants) {
+      try {
+        const { campaigns } = await campaignsApi.list(t.id, { limit: 100 });
+        allCampaigns.push(...campaigns);
+      } catch {
+        // skip
+      }
     }
   }
 
@@ -88,14 +103,24 @@ export default async function AllCampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">
-          All Campaigns
-        </h1>
-        <p className="text-sm text-muted">
-          {allCampaigns.length} campaign{allCampaigns.length !== 1 ? "s" : ""}{" "}
-          across {tenants.length} tenant{tenants.length !== 1 ? "s" : ""}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">
+            {isTenant ? "My Campaigns" : "All Campaigns"}
+          </h1>
+          <p className="text-sm text-muted">
+            {allCampaigns.length} campaign{allCampaigns.length !== 1 ? "s" : ""}
+            {!isTenant && ` across all tenants`}
+          </p>
+        </div>
+        {isTenant && ctx?.tenantId && (
+          <Link href={`/marketing/campaigns/new?tenant_id=${ctx.tenantId}`}>
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Campaign
+            </Button>
+          </Link>
+        )}
       </div>
 
       <DataTable

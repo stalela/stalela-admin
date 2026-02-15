@@ -376,8 +376,10 @@ A single paragraph about an emerging trend worth tracking.
 
 RULES:
 - 8-12 stories total, prioritize South Africa + Africa first
-- Each story: bold headline, 2-3 sentence summary, source link
-- Only include REAL news from today or this week — do not fabricate
+- EVERY story MUST have a clickable source link in [Source Name](https://full-url) format
+- Use the ACTUAL URL from your web search — never use placeholder or example.com URLs
+- Each story: bold headline, 2-3 sentence summary, source link at the end
+- Only include REAL news from today or this week — do not fabricate stories or URLs
 - Be opinionated — add brief "why it matters" where relevant
 - Keep the whole digest under 800 words`,
     `Create today's news digest. Search the web for the latest real news across all the beats.`,

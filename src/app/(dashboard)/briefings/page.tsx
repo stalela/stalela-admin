@@ -10,12 +10,14 @@ export default async function BriefingsPage({
 }) {
   const { date: dateParam } = await searchParams;
   const today = new Date().toISOString().slice(0, 10);
-  const date = dateParam || today;
 
-  const [briefings, stats, dates] = await Promise.all([
+  // Fetch available dates first so we can default to the most recent one with data
+  const dates = await briefingsApi.listDates(14);
+  const date = dateParam || (dates.length > 0 ? dates[0] : today);
+
+  const [briefings, stats] = await Promise.all([
     briefingsApi.listByDate(date),
     briefingsApi.statsForDate(date),
-    briefingsApi.listDates(14),
   ]);
 
   return (

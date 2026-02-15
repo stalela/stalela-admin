@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Hexagon, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 
@@ -12,7 +13,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,24 +20,13 @@ export default function LoginPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: authError } = isSignUp
-      ? await supabase.auth.signUp({
-          email,
-          password,
-        })
-      : await supabase.auth.signInWithPassword({
+    const { error: authError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
     if (authError) {
       setError(authError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (isSignUp) {
-      setError("Check your email for a confirmation link to complete sign-up.");
       setLoading(false);
       return;
     }
@@ -73,7 +62,7 @@ export default function LoginPage() {
             STALELA
           </h1>
           <p className="mt-1 text-xs uppercase tracking-[0.3em] text-muted">
-            {isSignUp ? "Admin Setup" : "Command Centre"}
+            Command Centre
           </p>
         </div>
 
@@ -84,13 +73,10 @@ export default function LoginPage() {
 
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-foreground">
-              {isSignUp ? "Create First Admin Account" : "Access Command Centre"}
+              Access Command Centre
             </h2>
             <p className="mt-1 text-sm text-muted">
-              {isSignUp
-                ? "Set up the initial administrator account for Stalela Command Centre"
-                : "Enter your credentials to access the admin dashboard"
-              }
+              Enter your credentials to access the admin dashboard
             </p>
           </div>
 
@@ -150,17 +136,15 @@ export default function LoginPage() {
               </div>
             )}
 
-            {!isSignUp && (
-              <div className="text-right -mt-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/login/forgot-password")}
-                  className="text-xs text-muted hover:text-copper-600 transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            )}
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                onClick={() => router.push("/login/forgot-password")}
+                className="text-xs text-muted hover:text-copper-600 transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
 
             <button
               type="submit"
@@ -170,25 +154,12 @@ export default function LoginPage() {
               {loading ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  {isSignUp ? "Creating Account..." : "Authenticating..."}
+                  Authenticating...
                 </span>
               ) : (
-                isSignUp ? "Create Admin Account" : "Enter Command Centre"
+                "Enter Command Centre"
               )}
             </button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-muted hover:text-copper-600 transition-colors"
-              >
-                {isSignUp
-                  ? "Already have an account? Sign in"
-                  : "Need to create first admin account? Sign up"
-                }
-              </button>
-            </div>
 
             <div className="relative my-2">
               <div className="absolute inset-0 flex items-center">
@@ -255,13 +226,12 @@ export default function LoginPage() {
             </button>
 
             <div className="text-center">
-              <button
-                type="button"
-                onClick={() => router.push("/signup")}
+              <Link
+                href="/signup"
                 className="text-sm text-copper-light hover:text-copper-600 transition-colors font-medium"
               >
                 Sign up for Stalela Marketing →
-              </button>
+              </Link>
             </div>
           </form>
 

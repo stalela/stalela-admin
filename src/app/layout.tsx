@@ -21,7 +21,11 @@ export const metadata: Metadata = {
   description: "Stalela administration dashboard",
   robots: { index: false, follow: false },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/logo-icon.svg", type: "image/svg+xml", sizes: "any" },
+    ],
+    apple: "/logo-icon.svg",
   },
 };
 

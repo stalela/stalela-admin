@@ -202,14 +202,19 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={async () => {
+                setError("");
                 setLoading(true);
                 const supabase = createClient();
-                await supabase.auth.signInWithOAuth({
+                const { error: oauthError } = await supabase.auth.signInWithOAuth({
                   provider: "google",
                   options: {
                     redirectTo: `${window.location.origin}/auth/callback`,
                   },
                 });
+                if (oauthError) {
+                  setError(oauthError.message);
+                  setLoading(false);
+                }
               }}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 rounded-lg border border-border bg-surface-elevated px-4 py-3 text-sm font-medium text-foreground hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

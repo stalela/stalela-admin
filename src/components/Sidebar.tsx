@@ -20,6 +20,8 @@ import {
   Newspaper,
   Megaphone,
   Target,
+  Globe,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -78,6 +80,7 @@ const adminNavigation: (NavItem | NavGroup)[] = [
       { label: "Overview", href: "/marketing", icon: Megaphone },
       { label: "Tenants", href: "/marketing/tenants", icon: Users },
       { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
+      { label: "Audit", href: "/marketing/onboarding", icon: Zap },
     ],
   },
 ];
@@ -85,6 +88,7 @@ const adminNavigation: (NavItem | NavGroup)[] = [
 /** Navigation for tenant users (marketing only, no Tenants admin) */
 const tenantNavigation: (NavItem | NavGroup)[] = [
   { label: "Dashboard", href: "/marketing", icon: LayoutDashboard },
+  { label: "Website Audit", href: "/marketing/onboarding", icon: Globe },
   { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
 ];
 

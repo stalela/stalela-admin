@@ -1,7 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Wakanda palette ─────────────────────────────────────────
+  /* ── Light mode — warm parchment palette ──────────────────
+     Clean, professional with copper accents on a warm background. */
+
+  --background: #faf8f5;
+  --foreground: #1c1917;
+  --surface: #ffffff;
+  --surface-elevated: #f5f0eb;
+  --surface-hover: #ede7df;
+  --border: #ddd5ca;
+  --border-bright: #c9bfb2;
+  --muted: #78716c;
+
+  /* Brand copper — same hex values */
+  --copper: #a4785a;
+  --copper-light: #8a6349;
+  --copper-50: #faf5f0;
+  --copper-100: #f0e4d6;
+  --copper-200: #e0c9ad;
+  --copper-600: #a4785a;
+  --copper-700: #8a6349;
+  --copper-800: #6e4f3a;
+
+  /* Accent glow — softer for light mode */
+  --glow: rgba(164, 120, 90, 0.08);
+  --glow-strong: rgba(164, 120, 90, 0.15);
+  --vibranium: #6c4cef;
+  --vibranium-dim: rgba(108, 76, 239, 0.06);
+  --vibranium-glow: rgba(108, 76, 239, 0.12);
+
+  /* Status colours */
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+
+  --charcoal: #1c1c1c;
+
+  color-scheme: light;
+}
+
+.dark {
+  /* ── Dark mode — Wakanda palette ─────────────────────────
      Dark, futuristic base with copper/gold accents.
      Inspired by vibranium tech meets South African heritage. */
 
@@ -14,7 +55,6 @@
   --border-bright: #3a3a4d;
   --muted: #6b6b80;
 
-  /* Brand copper — same hex values as marketing site */
   --copper: #a4785a;
   --copper-light: #d4a574;
   --copper-50: #faf5f0;
@@ -24,20 +64,20 @@
   --copper-700: #8a6349;
   --copper-800: #6e4f3a;
 
-  /* Wakanda accent glow — vibranium purple + copper */
   --glow: rgba(164, 120, 90, 0.15);
   --glow-strong: rgba(164, 120, 90, 0.3);
   --vibranium: #7c5cff;
   --vibranium-dim: rgba(124, 92, 255, 0.1);
   --vibranium-glow: rgba(124, 92, 255, 0.25);
 
-  /* Status colours */
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #60a5fa;
 
   --charcoal: #1c1c1c;
+
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -171,4 +211,12 @@ body {
 ::selection {
   background: var(--copper-600);
   color: #fff;
+}
+
+/* ── Shadow adjustments per mode ───────────────────────────── */
+.dark .shadow-xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.4);
+}
+.dark .shadow-lg {
+  --tw-shadow-color: rgba(0, 0, 0, 0.3);
 }

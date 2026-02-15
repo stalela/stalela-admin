@@ -446,7 +446,7 @@ export default function MarketingChat({ tenantId, userId }: Props) {
                   >
                     {msg.role === "assistant" ? (
                       <div
-                        className="prose prose-sm prose-invert max-w-none [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_p]:text-sm [&_li]:text-sm [&_strong]:text-copper-light"
+                        className="prose prose-sm dark:prose-invert max-w-none [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_p]:text-sm [&_li]:text-sm [&_strong]:text-copper-light"
                         dangerouslySetInnerHTML={{
                           __html: formatMarkdown(msg.content),
                         }}
@@ -463,7 +463,7 @@ export default function MarketingChat({ tenantId, userId }: Props) {
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-foreground">
                     <div
-                      className="prose prose-sm prose-invert max-w-none [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_p]:text-sm [&_li]:text-sm [&_strong]:text-copper-light"
+                      className="prose prose-sm dark:prose-invert max-w-none [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_p]:text-sm [&_li]:text-sm [&_strong]:text-copper-light"
                       dangerouslySetInnerHTML={{
                         __html: formatMarkdown(streamContent),
                       }}

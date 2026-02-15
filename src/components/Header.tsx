@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase-browser";
-import { LogOut, User, ChevronDown } from "lucide-react";
+import { LogOut, User, ChevronDown, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 const titles: Record<string, string> = {
   "/": "Dashboard",
@@ -32,7 +33,10 @@ export function Header({ userEmail, userName, userRole, avatarUrl }: HeaderProps
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const themeRef = useRef<HTMLDivElement>(null);
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -40,10 +44,13 @@ export function Header({ userEmail, userName, userRole, avatarUrl }: HeaderProps
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
+      if (themeRef.current && !themeRef.current.contains(e.target as Node)) {
+        setThemeMenuOpen(false);
+      }
     }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
+    if (open || themeMenuOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  }, [open, themeMenuOpen]);
 
   // Close on Escape
   useEffect(() => {
@@ -80,6 +87,46 @@ export function Header({ userEmail, userName, userRole, avatarUrl }: HeaderProps
         <div className="h-0.5 w-8 rounded-full bg-gradient-to-r from-copper-600 to-vibranium" />
       </div>
 
+      {/* Theme toggle + Profile dropdown */}
+      <div className="flex items-center gap-2">
+        {/* Theme toggle */}
+        <div className="relative" ref={themeRef}>
+          <button
+            onClick={() => setThemeMenuOpen((v) => !v)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 text-muted transition-colors hover:border-copper-600/50 hover:text-foreground"
+            title="Toggle theme"
+          >
+            {resolvedTheme === "dark" ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
+          </button>
+
+          {themeMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-36 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+              {([
+                { value: "light" as const, label: "Light", icon: Sun },
+                { value: "dark" as const, label: "Dark", icon: Moon },
+                { value: "system" as const, label: "System", icon: Monitor },
+              ]).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => { setTheme(value); setThemeMenuOpen(false); }}
+                  className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors ${
+                    theme === value
+                      ? "bg-copper-600/10 text-copper-light"
+                      : "text-foreground hover:bg-surface-hover"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
       {/* Profile dropdown */}
       <div className="relative" ref={dropdownRef}>
         <button
@@ -105,7 +152,7 @@ export function Header({ userEmail, userName, userRole, avatarUrl }: HeaderProps
         </button>
 
         {open && (
-          <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-lg border border-border bg-surface shadow-xl shadow-black/40">
+          <div className="absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-lg border border-border bg-surface shadow-xl dark:shadow-black/40">
             {/* User info */}
             <div className="border-b border-border px-4 py-3">
               <div className="flex items-center gap-3">
@@ -155,6 +202,7 @@ export function Header({ userEmail, userName, userRole, avatarUrl }: HeaderProps
             </div>
           </div>
         )}
+      </div>
       </div>
     </header>
   );

@@ -11,7 +11,8 @@
  *     -d @stalela-email-config.json
  */
 
-const LOGO_BASE64 = "PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0gNzIgNTAgUSA3MiAzOCwgNjUgMzAiIHN0cm9rZT0iI0Q0QTU3NCIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuOSIvPjxwYXRoIGQ9Ik0gNzggNTAgUSA3OCAzNCwgNjggMjIiIHN0cm9rZT0iI0Q0QTU3NCIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuNyIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDUwLCA1MCkiPjxwYXRoIGQ9Ik0gMCwtMjAgTCA1LC01IEwgMjAsMCBMIDUsNSBMIDAsMjAgTCAtNSw1IEwgLTIwLDAgTCAtNSwtNSBaIiBmaWxsPSIjRkZGRkZGIi8+PHBhdGggZD0iTSAxMiwtMTIgTCAxNCwtOCBMIDE4LC02IEwgMTQsLTQgTCAxMiwwIEwgMTAsLTQgTCA2LC02IEwgMTAsLTggWiIgZmlsbD0iI0Y1RjVGNSIvPjxwYXRoIGQ9Ik0gLTgsLTMgUSAtMTIsMCAtOCwzIiBzdHJva2U9IiNGNUY1RjUiIHN0cm9rZS13aWR0aD0iMi40IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz48L2c+PHBhdGggZD0iTSAyOCA1MCBRIDI4IDYyLCAzNSA3MCIgc3Ryb2tlPSIjRDRBNTc0IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgb3BhY2l0eT0iMC45Ii8+PHBhdGggZD0iTSAyMiA1MCBRIDIyIDY2LCAzMiA3OCIgc3Ryb2tlPSIjRDRBNTc0IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgb3BhY2l0eT0iMC43Ii8+PC9zdmc+";
+/** Publicly hosted PNG logo (white star + copper arcs on transparent bg) */
+const LOGO_URL = "https://hwfhtdlbtjhmwzyvejxd.supabase.co/storage/v1/object/public/assets/email/logo-white.png";
 
 function wrap(title: string, body: string): string {
   return `<!DOCTYPE html>
@@ -30,7 +31,7 @@ function wrap(title: string, body: string): string {
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#0a0a0c 0%,#1a1a22 100%);padding:28px 32px;text-align:center;">
-              <img src="data:image/svg+xml;base64,${LOGO_BASE64}" alt="Stalela" width="40" height="40" style="display:block;margin:0 auto 8px;" />
+              <img src="${LOGO_URL}" alt="Stalela" width="40" height="40" style="display:block;margin:0 auto 8px;" />
               <span style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:3px;">STALELA</span>
             </td>
           </tr>

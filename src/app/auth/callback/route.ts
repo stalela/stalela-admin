@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -55,8 +55,11 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (user) {
+    // Prefer tenant_name from query param (Google OAuth signup), then user_metadata (email signup), then email prefix
     const tenantName =
+      searchParams.get("tenant_name") ||
       (user.user_metadata?.tenant_name as string) ||
+      user.user_metadata?.full_name as string ||
       user.email?.split("@")[0] ||
       "My Agency";
 
@@ -92,7 +95,11 @@ export async function GET(request: NextRequest) {
       });
 
       // Link user as owner
-      await adminTenantsApi.addUser(tenant.id, user.id, "owner");
+      await adminTenantsApi.addUser({
+        tenant_id: tenant.id,
+        user_id: user.id,
+        role: "owner",
+      });
     }
   }
 

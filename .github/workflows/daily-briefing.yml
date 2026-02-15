@@ -36,3 +36,21 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           BRIEFING_BATCH_SIZE: ${{ inputs.batch_size || '10' }}
+
+      - name: Send WhatsApp notification
+        if: success() && hashFiles('briefing-summary.txt') != ''
+        run: |
+          SUMMARY=$(cat briefing-summary.txt)
+          curl -s -X POST \
+            "https://graph.facebook.com/v21.0/${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}/messages" \
+            -H "Authorization: Bearer ${{ secrets.WHATSAPP_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg body "$SUMMARY" \
+              '{
+                messaging_product: "whatsapp",
+                to: "27612673163",
+                type: "text",
+                text: { body: $body }
+              }'
+            )"

@@ -18,6 +18,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { writeFileSync } from "fs";
 
 /* ------------------------------------------------------------------ */
 /*  Config                                                              */
@@ -382,6 +383,25 @@ async function main() {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\n🎯 Done! ${success}/${targets.length} briefings generated in ${elapsed}s`);
   console.log(`   View in dashboard: /briefings?date=${today}\n`);
+
+  // Write summary for GitHub Actions (WhatsApp notification)
+  const companyNames = targets.slice(0, success).map((t) => t.name);
+  const summary = [
+    `📋 *Daily Outreach Briefing — ${today}*`,
+    ``,
+    `✅ ${success}/${targets.length} briefings generated in ${elapsed}s`,
+    ``,
+    `*Companies:*`,
+    ...companyNames.map((n, i) => `${i + 1}. ${n}`),
+    ``,
+    `🔗 Review in dashboard: /briefings?date=${today}`,
+  ].join("\n");
+
+  // Write to file so the workflow can pick it up
+  if (process.env.GITHUB_OUTPUT) {
+    writeFileSync("briefing-summary.txt", summary, "utf-8");
+    console.log("   Summary written to briefing-summary.txt");
+  }
 }
 
 main().catch((e) => {

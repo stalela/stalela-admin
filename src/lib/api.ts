@@ -14,6 +14,8 @@ import { createCompaniesApi } from "@stalela/commons/companies";
 import { createResearchApi } from "@stalela/commons/research";
 import { createBriefingsApi } from "@stalela/commons/briefings";
 import { createNewsApi } from "@stalela/commons/news";
+import { createTenantsApi } from "@stalela/commons/tenants";
+import { createCampaignsApi } from "@stalela/commons/campaigns";
 
 function lazy<T extends object>(factory: () => T): T {
   let instance: T | undefined;
@@ -42,3 +44,5 @@ export const companiesApi = lazy(() => createCompaniesApi(getClient()));
 export const researchApi = lazy(() => createResearchApi(getClient()));
 export const briefingsApi = lazy(() => createBriefingsApi(getClient()));
 export const newsApi = lazy(() => createNewsApi(getClient()));
+export const tenantsApi = lazy(() => createTenantsApi(getClient()));
+export const campaignsApi = lazy(() => createCampaignsApi(getClient()));

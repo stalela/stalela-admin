@@ -18,6 +18,8 @@ import {
   Network,
   List,
   Newspaper,
+  Megaphone,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -65,6 +67,15 @@ const navigation: (NavItem | NavGroup)[] = [
       { label: "All Companies", href: "/companies/list", icon: List },
       { label: "Map", href: "/companies/map", icon: MapPin },
       { label: "Graph", href: "/companies/graph", icon: Network },
+    ],
+  },
+  {
+    label: "Marketing",
+    icon: Megaphone,
+    items: [
+      { label: "Overview", href: "/marketing", icon: Megaphone },
+      { label: "Tenants", href: "/marketing/tenants", icon: Users },
+      { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
     ],
   },
 ];

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Clock,
   Mail,
+  Newspaper,
   Phone,
   Send,
   SkipForward,
@@ -16,7 +17,7 @@ import {
   Target,
   XCircle,
 } from "lucide-react";
-import type { DailyBriefing, BriefingStatus } from "@stalela/commons/types";
+import type { DailyBriefing, DailyNews, BriefingStatus } from "@stalela/commons/types";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ interface Props {
   briefings: DailyBriefing[];
   stats: BriefingStats;
   availableDates: string[];
+  news: DailyNews | null;
 }
 
 /* ── Status helpers ───────────────────────────────────────────── */
@@ -58,11 +60,12 @@ const priorityLabel: Record<number, { label: string; color: string }> = {
 
 /* ── Main component ───────────────────────────────────────────── */
 
-export function BriefingsDashboard({ date, today, briefings, stats, availableDates }: Props) {
+export function BriefingsDashboard({ date, today, briefings, stats, availableDates, news }: Props) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [filter, setFilter] = useState<BriefingStatus | "all">("all");
+  const [activeTab, setActiveTab] = useState<"outreach" | "news">("outreach");
 
   const isToday = date === today;
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-ZA", {
@@ -139,6 +142,96 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
           </select>
         </div>
       </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 rounded-lg border border-border bg-surface-elevated p-1">
+        <button
+          onClick={() => setActiveTab("outreach")}
+          className={cn(
+            "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+            activeTab === "outreach"
+              ? "bg-copper-600 text-white"
+              : "text-muted hover:text-foreground"
+          )}
+        >
+          <Target className="h-4 w-4" />
+          Outreach
+          {stats.total > 0 && (
+            <span className={cn(
+              "rounded-full px-1.5 text-xs",
+              activeTab === "outreach" ? "bg-white/20" : "bg-surface text-muted"
+            )}>
+              {stats.total}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("news")}
+          className={cn(
+            "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+            activeTab === "news"
+              ? "bg-copper-600 text-white"
+              : "text-muted hover:text-foreground"
+          )}
+        >
+          <Newspaper className="h-4 w-4" />
+          News Briefing
+          {news && (
+            <span className={cn(
+              "rounded-full px-1.5 text-xs",
+              activeTab === "news" ? "bg-white/20" : "bg-surface text-muted"
+            )}>
+              ●
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── News Tab ─────────────────────────────────────────── */}
+      {activeTab === "news" && (
+        <div className="space-y-4">
+          {news ? (
+            <div className="rounded-xl border border-border bg-surface p-6">
+              <div
+                className="prose prose-invert prose-sm max-w-none
+                  prose-headings:text-foreground prose-headings:font-semibold
+                  prose-h1:text-xl prose-h1:mb-4 prose-h1:border-b prose-h1:border-border prose-h1:pb-3
+                  prose-h2:text-base prose-h2:mt-6 prose-h2:mb-3 prose-h2:text-copper-light
+                  prose-p:text-muted prose-p:leading-relaxed
+                  prose-li:text-muted prose-li:leading-relaxed
+                  prose-strong:text-foreground
+                  prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline
+                  prose-ul:space-y-2"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(news.content) }}
+              />
+              <div className="mt-6 flex items-center gap-2 border-t border-border pt-4">
+                {news.topics.map((topic) => (
+                  <Badge key={topic} variant="copper">{topic}</Badge>
+                ))}
+                <span className="ml-auto text-xs text-muted">
+                  Generated {new Date(news.created_at).toLocaleTimeString("en-ZA", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Newspaper className="mb-4 h-12 w-12 text-copper-600/40" />
+              <h3 className="text-lg font-semibold text-foreground">
+                No news digest for this date
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                The daily agent hasn&apos;t generated a news briefing yet.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Outreach Tab ─────────────────────────────────────── */}
+      {activeTab === "outreach" && (<>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -391,8 +484,33 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
           );
         })}
       </div>
+
+      </>)}
     </div>
   );
+}
+
+/* ── Markdown renderer ──────────────────────────────────────── */
+
+function renderMarkdown(md: string): string {
+  return md
+    // Headers
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    // Unordered list items
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    // Wrap consecutive <li> in <ul>
+    .replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
+    // Line breaks for remaining text
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hup]|<li|<ul)(.*\S.*)$/gm, '<p>$1</p>');
 }
 
 /* ── Small action button ────────────────────────────────────── */

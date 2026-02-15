@@ -335,6 +335,82 @@ async function saveBriefing(draft: BriefingDraft): Promise<void> {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Step 0: Generate news digest                                        */
+/* ------------------------------------------------------------------ */
+
+const NEWS_TOPICS = [
+  "South African tech industry",
+  "AI and machine learning",
+  "fintech in Africa",
+  "B2B SaaS and enterprise",
+  "software engineering and coding",
+  "South African business & economy",
+];
+
+async function generateNewsBriefing(): Promise<void> {
+  const response = await chatCompletion(
+    `You are a sharp, concise tech and business news curator writing for a South African B2B founder/CEO.
+Produce a daily digest for ${today} covering these beats: ${NEWS_TOPICS.join(", ")}.
+
+FORMAT (use markdown):
+# 📰 Daily News Briefing — ${today}
+
+## 🇿🇦 South Africa & Africa
+- **Headline**: 2-3 sentence summary with context. [Source](url)
+- ...
+
+## 🤖 AI & Tech
+- **Headline**: 2-3 sentence summary. [Source](url)
+- ...
+
+## 💰 Fintech & B2B
+- **Headline**: 2-3 sentence summary. [Source](url)
+- ...
+
+## 💻 Dev & Engineering
+- **Headline**: 2-3 sentence summary. [Source](url)
+- ...
+
+## 🔮 One Thing to Watch
+A single paragraph about an emerging trend worth tracking.
+
+RULES:
+- 8-12 stories total, prioritize South Africa + Africa first
+- Each story: bold headline, 2-3 sentence summary, source link
+- Only include REAL news from today or this week — do not fabricate
+- Be opinionated — add brief "why it matters" where relevant
+- Keep the whole digest under 800 words`,
+    `Create today's news digest. Search the web for the latest real news across all the beats.`,
+    true
+  );
+
+  // Determine which topics were covered
+  const topicsFound: string[] = [];
+  const lower = response.toLowerCase();
+  if (lower.includes("south africa") || lower.includes("africa"))
+    topicsFound.push("south-africa");
+  if (lower.includes("ai") || lower.includes("artificial intelligence"))
+    topicsFound.push("ai");
+  if (lower.includes("fintech") || lower.includes("b2b"))
+    topicsFound.push("fintech", "b2b");
+  if (lower.includes("coding") || lower.includes("engineering") || lower.includes("developer"))
+    topicsFound.push("dev");
+  if (lower.includes("tech")) topicsFound.push("tech");
+
+  // Upsert to daily_news table
+  const { error } = await supabase.from("daily_news").upsert(
+    {
+      date: today,
+      content: response,
+      topics: [...new Set(topicsFound)],
+    },
+    { onConflict: "date" }
+  );
+
+  if (error) throw error;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -343,6 +419,15 @@ async function main() {
   console.log(`   Batch size: ${BATCH_SIZE}\n`);
 
   const startTime = Date.now();
+
+  // 0. Generate news digest (runs first, independent of company outreach)
+  console.log("📰 Step 0: Generating news digest…\n");
+  try {
+    await generateNewsBriefing();
+    console.log("   ✅ News digest saved\n");
+  } catch (e) {
+    console.error("   ❌ News digest failed:", e instanceof Error ? e.message : String(e));
+  }
 
   // 1. Discover opportunities
   const opportunities = await discoverOpportunities();

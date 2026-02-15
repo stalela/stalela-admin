@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bot,
   Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Clock,
   ClipboardCopy,
+  Loader2,
   Mail,
   Newspaper,
   Phone,
   Send,
+  SendHorizontal,
   SkipForward,
   Sparkles,
   Target,
@@ -23,6 +26,13 @@ import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
 import { cn } from "@/lib/utils";
 import { buildEmailHtml, copyHtmlToClipboard } from "@/lib/email-template";
+
+/* ── Chat types ───────────────────────────────────────────────── */
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -67,8 +77,16 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [filter, setFilter] = useState<BriefingStatus | "all">("all");
-  const [activeTab, setActiveTab] = useState<"outreach" | "news">("outreach");
+  const [activeTab, setActiveTab] = useState<"outreach" | "news" | "ai">("outreach");
   const [copied, setCopied] = useState<string | null>(null);
+
+  /* ── AI Chat state ──────────────────────────────────────────── */
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatStreaming, setChatStreaming] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
   const isToday = date === today;
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-ZA", {
@@ -134,6 +152,104 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
       setTimeout(() => setCopied(null), 3000);
     }
   }
+
+  /* ── AI Chat ────────────────────────────────────────────────── */
+
+  const scrollToBottom = useCallback(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages, scrollToBottom]);
+
+  async function sendChatMessage(text?: string) {
+    const question = (text ?? chatInput).trim();
+    if (!question || chatLoading) return;
+
+    setChatInput("");
+    const userMsg: ChatMessage = { role: "user", content: question };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatLoading(true);
+    setChatStreaming(true);
+
+    // Add placeholder for assistant response
+    setChatMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+    try {
+      const history = chatMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const res = await fetch("/api/briefings/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, history }),
+      });
+
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const payload = line.slice(6);
+              if (payload === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(payload);
+                if (parsed.content) {
+                  accumulated += parsed.content;
+                  setChatMessages((prev) => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                      role: "assistant",
+                      content: accumulated,
+                    };
+                    return updated;
+                  });
+                }
+              } catch {
+                // skip malformed SSE
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[briefings-chat]", err);
+      setChatMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          role: "assistant",
+          content: "Sorry, something went wrong. Please try again.",
+        };
+        return updated;
+      });
+    } finally {
+      setChatLoading(false);
+      setChatStreaming(false);
+    }
+  }
+
+  const suggestedPrompts = [
+    "Summarize today's briefings",
+    "Which leads need follow-up?",
+    "Show me top priority outreach",
+    "What are the latest news trends?",
+    "Give me lead pipeline metrics",
+    "How many companies in Gauteng?",
+  ];
 
   /* ── Render ─────────────────────────────────────────────────── */
 
@@ -212,6 +328,18 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab("ai")}
+          className={cn(
+            "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+            activeTab === "ai"
+              ? "bg-copper-600 text-white"
+              : "text-muted hover:text-foreground"
+          )}
+        >
+          <Bot className="h-4 w-4" />
+          AI Assistant
+        </button>
       </div>
 
       {/* ── News Tab ─────────────────────────────────────────── */}
@@ -254,6 +382,142 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── AI Assistant Tab ─────────────────────────────────── */}
+      {activeTab === "ai" && (
+        <div className="flex flex-col rounded-xl border border-border bg-surface" style={{ height: "calc(100vh - 280px)" }}>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {chatMessages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-copper-600/10 mb-4">
+                  <Bot className="h-8 w-8 text-copper-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-1">
+                  Stalela AI Assistant
+                </h3>
+                <p className="text-sm text-muted mb-6 max-w-md">
+                  Ask me anything about your briefings, pipeline, metrics, companies, or market trends.
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-w-lg">
+                  {suggestedPrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => sendChatMessage(prompt)}
+                      className="rounded-lg border border-border bg-surface-elevated px-3 py-2.5 text-left text-sm text-muted transition-colors hover:border-copper-600/40 hover:text-foreground"
+                    >
+                      <Sparkles className="inline h-3.5 w-3.5 mr-1.5 text-copper-600" />
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {chatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
+              >
+                <div
+                  className={cn(
+                    "max-w-[80%] rounded-xl px-4 py-3 text-sm",
+                    msg.role === "user"
+                      ? "bg-copper-600 text-white"
+                      : "bg-surface-elevated border border-border text-foreground"
+                  )}
+                >
+                  {msg.role === "assistant" ? (
+                    msg.content ? (
+                      <div
+                        className="prose prose-invert prose-sm max-w-none
+                          prose-headings:text-foreground prose-headings:font-semibold
+                          prose-h1:text-base prose-h1:mb-2
+                          prose-h2:text-sm prose-h2:mt-4 prose-h2:mb-2 prose-h2:text-copper-light
+                          prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1 prose-h3:text-copper-light
+                          prose-p:text-muted prose-p:leading-relaxed prose-p:my-1.5
+                          prose-li:text-muted prose-li:leading-relaxed
+                          prose-strong:text-foreground
+                          prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline
+                          prose-table:text-sm
+                          prose-th:text-foreground prose-th:font-medium prose-th:px-2 prose-th:py-1
+                          prose-td:text-muted prose-td:px-2 prose-td:py-1
+                          prose-code:text-copper-light prose-code:bg-background prose-code:px-1 prose-code:rounded"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted">
+                        <Loader2 className="h-4 w-4 animate-spin text-copper-600" />
+                        <span className="text-sm">Thinking…</span>
+                      </div>
+                    )
+                  ) : (
+                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input bar */}
+          <div className="border-t border-border p-4">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={chatInputRef}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                  }
+                }}
+                placeholder="Ask about briefings, metrics, leads, companies…"
+                rows={1}
+                className="flex-1 resize-none rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none"
+                style={{ maxHeight: "120px" }}
+              />
+              <button
+                onClick={() => sendChatMessage()}
+                disabled={!chatInput.trim() || chatLoading}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-copper-600 text-white transition-colors hover:bg-copper-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {chatStreaming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SendHorizontal className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            {chatMessages.length > 0 && (
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestedPrompts.slice(0, 3).map((prompt) => (
+                    <button
+                      key={prompt}
+                      disabled={chatLoading}
+                      onClick={() => sendChatMessage(prompt)}
+                      className="rounded-md bg-surface-elevated px-2 py-1 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-40"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setChatMessages([])}
+                  className="text-xs text-muted hover:text-foreground transition-colors"
+                >
+                  Clear chat
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

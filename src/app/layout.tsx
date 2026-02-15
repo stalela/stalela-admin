@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   },
   description: "Stalela administration dashboard",
   robots: { index: false, follow: false },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  ClipboardCopy,
   Mail,
   Newspaper,
   Phone,
@@ -21,6 +22,7 @@ import type { DailyBriefing, DailyNews, BriefingStatus } from "@stalela/commons/
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/Badge";
 import { cn } from "@/lib/utils";
+import { buildEmailHtml, copyHtmlToClipboard } from "@/lib/email-template";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -66,6 +68,7 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
   const [updating, setUpdating] = useState<string | null>(null);
   const [filter, setFilter] = useState<BriefingStatus | "all">("all");
   const [activeTab, setActiveTab] = useState<"outreach" | "news">("outreach");
+  const [copied, setCopied] = useState<string | null>(null);
 
   const isToday = date === today;
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-ZA", {
@@ -100,12 +103,36 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
 
   function openGmail(briefing: DailyBriefing) {
     if (!briefing.email_draft_subject || !briefing.email_draft_body) return;
+    // Copy branded HTML to clipboard first, then open Gmail compose
+    const html = buildEmailHtml({
+      subject: briefing.email_draft_subject,
+      body: briefing.email_draft_body,
+      companyName: briefing.company_name,
+    });
+    copyHtmlToClipboard(html).then((ok) => {
+      if (ok) setCopied(briefing.id);
+      setTimeout(() => setCopied(null), 3000);
+    });
     const params = new URLSearchParams({
       view: "cm",
       su: briefing.email_draft_subject,
       body: briefing.email_draft_body,
     });
     window.open(`https://mail.google.com/mail/?${params.toString()}`, "_blank");
+  }
+
+  async function copyBrandedEmail(briefing: DailyBriefing) {
+    if (!briefing.email_draft_subject || !briefing.email_draft_body) return;
+    const html = buildEmailHtml({
+      subject: briefing.email_draft_subject,
+      body: briefing.email_draft_body,
+      companyName: briefing.company_name,
+    });
+    const ok = await copyHtmlToClipboard(html);
+    if (ok) {
+      setCopied(briefing.id);
+      setTimeout(() => setCopied(null), 3000);
+    }
   }
 
   /* ── Render ─────────────────────────────────────────────────── */
@@ -461,6 +488,15 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                           Send via Gmail
                         </button>
                       )}
+                    {briefing.email_draft_body && (
+                      <button
+                        onClick={() => copyBrandedEmail(briefing)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-vibranium/10 px-3 py-2 text-sm font-medium text-vibranium transition-colors hover:bg-vibranium/20"
+                      >
+                        <ClipboardCopy className="h-4 w-4" />
+                        {copied === briefing.id ? "Copied!" : "Copy Branded Email"}
+                      </button>
+                    )}
                     {briefing.status === "pending" && (
                       <button
                         disabled={isUpdating}

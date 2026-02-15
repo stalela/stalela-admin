@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -12,7 +13,6 @@ import {
   BarChart3,
   LogOut,
   ChevronDown,
-  Hexagon,
   Building2,
   MapPin,
   Network,
@@ -160,12 +160,13 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-surface">
       {/* ── Logo ── */}
       <div className="flex h-16 items-center gap-3 border-b border-border px-5">
-        <div className="relative">
-          <Hexagon className="h-8 w-8 text-copper-600" strokeWidth={1.5} />
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-copper-light">
-            S
-          </span>
-        </div>
+        <Image
+          src="/logo-icon-dark.svg"
+          alt="Stalela"
+          width={36}
+          height={36}
+          className="shrink-0"
+        />
         <div>
           <h1 className="text-base font-bold tracking-wide text-foreground">
             STALELA

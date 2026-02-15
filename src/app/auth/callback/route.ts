@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const response = NextResponse.next({ request });
+  // Collect cookies set by Supabase during code exchange so we can
+  // copy them onto whichever redirect response we return.
+  const pendingCookies: { name: string; value: string; options?: Record<string, unknown> }[] = [];
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,9 +26,7 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          pendingCookies.push(...cookiesToSet);
         },
       },
     }
@@ -34,19 +34,25 @@ export async function GET(request: NextRequest) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-  if (error) {
+  // Helper: create a redirect and copy all pending auth cookies onto it
+  function redirectWithCookies(pathname: string, search = ""): NextResponse {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("error", "verification_failed");
-    return NextResponse.redirect(url);
+    url.pathname = pathname;
+    url.search = search;
+    const res = NextResponse.redirect(url);
+    for (const { name, value, options } of pendingCookies) {
+      res.cookies.set(name, value, options);
+    }
+    return res;
+  }
+
+  if (error) {
+    return redirectWithCookies("/login", `?error=verification_failed`);
   }
 
   // Handle password recovery — redirect to password update page
   if (type === "recovery") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login/reset-password";
-    url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithCookies("/login/reset-password");
   }
 
   // Check if this user needs a tenant provisioned
@@ -103,9 +109,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Redirect to marketing dashboard
-  const url = request.nextUrl.clone();
-  url.pathname = "/marketing";
-  url.search = "";
-  return NextResponse.redirect(url);
+  // Redirect to marketing dashboard with session cookies
+  return redirectWithCookies("/marketing");
 }

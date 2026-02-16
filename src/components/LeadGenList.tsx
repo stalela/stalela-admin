@@ -15,6 +15,7 @@ import {
   Trash2,
   ExternalLink,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/Button";
@@ -39,12 +40,28 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+const SA_PROVINCES = [
+  "Eastern Cape",
+  "Free State",
+  "Gauteng",
+  "KwaZulu-Natal",
+  "Limpopo",
+  "Mpumalanga",
+  "Northern Cape",
+  "North West",
+  "Western Cape",
+];
+
 export default function LeadGenList({
   initialLeads,
   initialTotal,
+  tenantId,
+  tenantSettings,
 }: {
   initialLeads: GeneratedLead[];
   initialTotal: number;
+  tenantId: string;
+  tenantSettings: Record<string, unknown>;
 }) {
   const router = useRouter();
   const [leads, setLeads] = useState(initialLeads);
@@ -54,31 +71,72 @@ export default function LeadGenList({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [savedSettings, setSavedSettings] = useState(tenantSettings);
+
+  /* ── Check if profile is complete enough for lead gen ────────── */
+  function isProfileComplete(s: Record<string, unknown>) {
+    return !!s.industry && (!!s.city || !!s.province);
+  }
+
+  /* ── Intercept generate — show modal if profile incomplete ──── */
+  function handleGenerateClick() {
+    if (isProfileComplete(savedSettings)) {
+      doGenerate();
+    } else {
+      setShowProfileModal(true);
+    }
+  }
 
   /* ── Generate leads ─────────────────────────────────────────── */
-  async function handleGenerate() {
+  async function doGenerate(profileOverrides?: { industry?: string; city?: string; province?: string }) {
     setGenerating(true);
     setError(null);
     try {
       const res = await fetch("/api/marketing/leads/generate", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileOverrides || {}),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Failed (${res.status})`);
       }
-      router.refresh();
-      // Also update local state from response
       const data = await res.json();
       if (data.leads) {
         setLeads((prev) => [...data.leads, ...prev]);
         setTotal((prev) => prev + data.leads.length);
       }
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate leads");
     } finally {
       setGenerating(false);
     }
+  }
+
+  /* ── Handle profile modal submit ────────────────────────────── */
+  async function handleProfileSubmit(profile: { industry: string; city: string; province: string; target_market?: string }) {
+    setShowProfileModal(false);
+    setError(null);
+
+    // Save to tenant settings
+    try {
+      const newSettings = { ...savedSettings, ...profile };
+      const res = await fetch(`/api/marketing/tenants/${tenantId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: newSettings }),
+      });
+      if (res.ok) {
+        setSavedSettings(newSettings);
+      }
+    } catch {
+      // Best effort — generate will still use override params
+    }
+
+    // Generate with overrides so the route has the data immediately
+    doGenerate({ industry: profile.industry, city: profile.city, province: profile.province });
   }
 
   /* ── Update lead status ─────────────────────────────────────── */
@@ -173,7 +231,7 @@ export default function LeadGenList({
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGenerate}
+              onClick={handleGenerateClick}
               disabled={generating}
             >
               {generating ? (
@@ -184,7 +242,7 @@ export default function LeadGenList({
               Generate More
             </Button>
           )}
-          <Button onClick={handleGenerate} disabled={generating}>
+          <Button onClick={handleGenerateClick} disabled={generating}>
             {generating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -198,6 +256,20 @@ export default function LeadGenList({
           </Button>
         </div>
       </div>
+
+      {/* ── Profile modal ──────────────────────────────────────── */}
+      {showProfileModal && (
+        <ProfileModal
+          initialValues={{
+            industry: (savedSettings.industry as string) || "",
+            city: (savedSettings.city as string) || "",
+            province: (savedSettings.province as string) || "",
+            target_market: (savedSettings.target_market as string) || "",
+          }}
+          onSubmit={handleProfileSubmit}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
 
       {/* ── Error banner ───────────────────────────────────────── */}
       {error && (
@@ -243,6 +315,11 @@ export default function LeadGenList({
               leads matched to your business profile using AI analysis of our
               company database.
             </p>
+            {!isProfileComplete(savedSettings) && (
+              <p className="mt-2 max-w-md text-xs text-warning">
+                We&apos;ll need a few details about your business first — industry and location — so we can find the right matches.
+              </p>
+            )}
           </div>
         </Card>
       )}
@@ -300,6 +377,142 @@ export default function LeadGenList({
 /* ================================================================== */
 /*  Sub-components                                                      */
 /* ================================================================== */
+
+/* ── Profile completion modal ──────────────────────────────── */
+
+function ProfileModal({
+  initialValues,
+  onSubmit,
+  onClose,
+}: {
+  initialValues: { industry: string; city: string; province: string; target_market: string };
+  onSubmit: (profile: { industry: string; city: string; province: string; target_market: string }) => void;
+  onClose: () => void;
+}) {
+  const [industry, setIndustry] = useState(initialValues.industry);
+  const [city, setCity] = useState(initialValues.city);
+  const [province, setProvince] = useState(initialValues.province);
+  const [targetMarket, setTargetMarket] = useState(initialValues.target_market);
+
+  const canSubmit = industry.trim().length > 0 && (city.trim().length > 0 || province.trim().length > 0);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    onSubmit({
+      industry: industry.trim(),
+      city: city.trim(),
+      province: province.trim(),
+      target_market: targetMarket.trim(),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="relative mx-4 w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-2xl">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 text-muted hover:text-foreground transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-copper-600/10">
+              <Sparkles className="h-5 w-5 text-copper-light" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">
+              Tell us about your business
+            </h2>
+          </div>
+          <p className="text-sm text-muted">
+            We need a few details to find the most relevant B2B leads for you. This info will be saved to your profile.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Industry */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Industry / Sector <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              placeholder="e.g. Digital Marketing, Construction, Legal Services"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted/50 focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600"
+              autoFocus
+            />
+            <p className="mt-1 text-xs text-muted">What does your business do?</p>
+          </div>
+
+          {/* Province */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Province <span className="text-danger">*</span>
+            </label>
+            <select
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600"
+            >
+              <option value="">Select province…</option>
+              {SA_PROVINCES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              City
+            </label>
+            <input
+              type="text"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="e.g. Johannesburg, Cape Town, Durban"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted/50 focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600"
+            />
+          </div>
+
+          {/* Target market */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Target Market
+            </label>
+            <input
+              type="text"
+              value={targetMarket}
+              onChange={(e) => setTargetMarket(e.target.value)}
+              placeholder="e.g. SMEs, Retail, Healthcare providers"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted/50 focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600"
+            />
+            <p className="mt-1 text-xs text-muted">What types of businesses are you trying to reach?</p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!canSubmit}>
+              <Sparkles className="h-4 w-4" />
+              Save &amp; Generate Leads
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function FilterButton({
   active,

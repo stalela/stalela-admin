@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
 
     const tenantId = ctx.tenantId;
 
+    // Accept optional profile overrides from request body
+    let bodyOverrides: { industry?: string; city?: string; province?: string } = {};
+    try {
+      bodyOverrides = await request.json();
+    } catch {
+      // No body or invalid JSON — fine, we'll use tenant settings
+    }
+
     if (!DASHSCOPE_API_KEY) {
       return NextResponse.json(
         { error: "AI service not configured (DASHSCOPE_API_KEY missing)" },
@@ -54,9 +62,9 @@ export async function POST(request: NextRequest) {
     ]);
 
     const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
-    const industry = (settings.industry as string) || null;
-    const city = (settings.city as string) || null;
-    const province = (settings.province as string) || null;
+    const industry = bodyOverrides.industry || (settings.industry as string) || null;
+    const city = bodyOverrides.city || (settings.city as string) || null;
+    const province = bodyOverrides.province || (settings.province as string) || null;
     const companyName = tenant?.name || "Unknown";
     const websiteUrl = tenant?.website_url || null;
 

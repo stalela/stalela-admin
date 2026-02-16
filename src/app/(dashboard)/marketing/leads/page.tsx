@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { getTenantContext, isTenantUser } from "@/lib/tenant-context";
-import { leadGenApi } from "@/lib/api";
+import { leadGenApi, tenantsApi } from "@/lib/api";
 import LeadGenList from "@/components/LeadGenList";
 import type { GeneratedLead } from "@stalela/commons/types";
 
@@ -23,12 +23,19 @@ export default async function LeadsPage() {
 
   let leads: GeneratedLead[] = [];
   let total = 0;
+  let tenantSettings: Record<string, unknown> = {};
   try {
     const result = await leadGenApi.list(ctx.tenantId);
     leads = result.leads;
     total = result.total;
   } catch {
     // skip — table may not exist yet
+  }
+  try {
+    const tenant = await tenantsApi.getById(ctx.tenantId);
+    tenantSettings = (tenant.settings ?? {}) as Record<string, unknown>;
+  } catch {
+    // skip
   }
 
   return (
@@ -40,7 +47,12 @@ export default async function LeadsPage() {
         </p>
       </div>
 
-      <LeadGenList initialLeads={leads} initialTotal={total} />
+      <LeadGenList
+        initialLeads={leads}
+        initialTotal={total}
+        tenantId={ctx.tenantId}
+        tenantSettings={tenantSettings}
+      />
     </div>
   );
 }

@@ -24,6 +24,8 @@ export default async function LeadsPage() {
   let leads: GeneratedLead[] = [];
   let total = 0;
   let tenantSettings: Record<string, unknown> = {};
+  let tenantPlan = "free";
+  let monthlyUsage = 0;
   try {
     const result = await leadGenApi.list(ctx.tenantId);
     leads = result.leads;
@@ -34,6 +36,12 @@ export default async function LeadsPage() {
   try {
     const tenant = await tenantsApi.getById(ctx.tenantId);
     tenantSettings = (tenant.settings ?? {}) as Record<string, unknown>;
+    tenantPlan = tenant.plan || "free";
+  } catch {
+    // skip
+  }
+  try {
+    monthlyUsage = await leadGenApi.countMonthly(ctx.tenantId);
   } catch {
     // skip
   }
@@ -52,6 +60,8 @@ export default async function LeadsPage() {
         initialTotal={total}
         tenantId={ctx.tenantId}
         tenantSettings={tenantSettings}
+        tenantPlan={tenantPlan}
+        monthlyUsage={monthlyUsage}
       />
     </div>
   );

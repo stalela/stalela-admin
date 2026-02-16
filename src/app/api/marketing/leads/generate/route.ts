@@ -9,6 +9,7 @@ import {
 import { createClient } from "@/lib/supabase-server";
 import { getTenantContext, isTenantUser } from "@/lib/tenant-context";
 import type { Company, GeneratedLeadInsert } from "@stalela/commons/types";
+import { FREE_VISIBLE_LEADS, PREMIUM_MONTHLY_LEAD_CAP } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     const tenantId = ctx.tenantId;
 
     // Accept optional profile overrides from request body
-    let bodyOverrides: { industry?: string; city?: string; province?: string } = {};
+    let bodyOverrides: { industry?: string; city?: string; province?: string; additional_details?: string } = {};
     try {
       bodyOverrides = await request.json();
     } catch {
@@ -54,17 +55,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* ── Gather tenant profile ────────────────────────────────── */
-    const [tenant, audits, competitors] = await Promise.all([
+    /* ── Gather tenant profile + usage ─────────────────────────── */
+    const [tenant, audits, competitors, monthlyUsage] = await Promise.all([
       tenantsApi.getById(tenantId).catch(() => null),
       auditsApi.list(tenantId).catch(() => []),
       competitorsApi.list(tenantId).catch(() => []),
+      leadGenApi.countMonthly(tenantId).catch(() => 0),
     ]);
+
+    const plan = tenant?.plan || "free";
+    const monthlyLimit = plan === "premium" ? PREMIUM_MONTHLY_LEAD_CAP : Infinity;
+
+    // Premium users: enforce monthly cap
+    if (plan === "premium" && monthlyUsage >= PREMIUM_MONTHLY_LEAD_CAP) {
+      return NextResponse.json(
+        {
+          error: `Monthly lead generation limit reached (${monthlyUsage}/${PREMIUM_MONTHLY_LEAD_CAP})`,
+          plan,
+          monthlyUsage,
+          monthlyLimit: PREMIUM_MONTHLY_LEAD_CAP,
+        },
+        { status: 429 }
+      );
+    }
 
     const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
     const industry = bodyOverrides.industry || (settings.industry as string) || null;
     const city = bodyOverrides.city || (settings.city as string) || null;
     const province = bodyOverrides.province || (settings.province as string) || null;
+    const additionalDetails = bodyOverrides.additional_details || null;
     const companyName = tenant?.name || "Unknown";
     const websiteUrl = tenant?.website_url || null;
 
@@ -221,6 +240,7 @@ ${auditBrandSummary ? `- Brand Summary: ${auditBrandSummary}` : ""}
 ${auditPositioning ? `- Market Positioning: ${auditPositioning}` : ""}
 ${competitorNames.length > 0 ? `- Known Competitors (exclude these): ${competitorNames.join(", ")}` : ""}
 ${neo4jCandidateNames.length > 0 ? `- Industry Clusters (from graph data): ${neo4jCandidateNames.join(", ")}` : ""}
+${additionalDetails ? `- Additional Requirements: ${additionalDetails}` : ""}
 
 CANDIDATE COMPANIES (select 10 from these):
 ${JSON.stringify(companyListForAI, null, 2)}
@@ -362,6 +382,10 @@ Return a JSON object with this exact structure:
     return NextResponse.json({
       leads: savedLeads,
       count: savedLeads.length,
+      plan,
+      visibleCount: plan === "free" ? FREE_VISIBLE_LEADS : savedLeads.length,
+      monthlyUsage: monthlyUsage + savedLeads.length,
+      monthlyLimit: plan === "premium" ? PREMIUM_MONTHLY_LEAD_CAP : null,
     });
   } catch (e) {
     console.error("[lead-gen] Error:", e);

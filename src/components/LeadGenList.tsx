@@ -16,12 +16,17 @@ import {
   ExternalLink,
   RefreshCw,
   X,
+  Lock,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { Card } from "@/components/Card";
 import type { GeneratedLead, GeneratedLeadStatus } from "@stalela/commons/types";
+
+/** Matches FREE_VISIBLE_LEADS in src/lib/stripe.ts */
+const FREE_VISIBLE_LEADS = 3;
 
 const STATUS_OPTIONS: { value: GeneratedLeadStatus; label: string; variant: "default" | "success" | "warning" | "danger" | "info" | "copper" }[] = [
   { value: "new", label: "New", variant: "info" },
@@ -57,12 +62,17 @@ export default function LeadGenList({
   initialTotal,
   tenantId,
   tenantSettings,
+  tenantPlan = "free",
+  monthlyUsage = 0,
 }: {
   initialLeads: GeneratedLead[];
   initialTotal: number;
   tenantId: string;
   tenantSettings: Record<string, unknown>;
+  tenantPlan?: string;
+  monthlyUsage?: number;
 }) {
+  const isFree = tenantPlan !== "premium" && tenantPlan !== "enterprise";
   const router = useRouter();
   const [leads, setLeads] = useState(initialLeads);
   const [total, setTotal] = useState(initialTotal);
@@ -89,7 +99,7 @@ export default function LeadGenList({
   }
 
   /* ── Generate leads ─────────────────────────────────────────── */
-  async function doGenerate(profileOverrides?: { industry?: string; city?: string; province?: string }) {
+  async function doGenerate(profileOverrides?: { industry?: string; city?: string; province?: string; additional_details?: string }) {
     setGenerating(true);
     setError(null);
     try {
@@ -116,13 +126,14 @@ export default function LeadGenList({
   }
 
   /* ── Handle profile modal submit ────────────────────────────── */
-  async function handleProfileSubmit(profile: { industry: string; city: string; province: string; target_market?: string }) {
+  async function handleProfileSubmit(profile: { industry: string; city: string; province: string; target_market?: string; additional_details?: string }) {
     setShowProfileModal(false);
     setError(null);
 
-    // Save to tenant settings
+    // Save to tenant settings (exclude additional_details — it's per-generation, not a saved setting)
     try {
-      const newSettings = { ...savedSettings, ...profile };
+      const { additional_details: _, ...settingsToSave } = profile;
+      const newSettings = { ...savedSettings, ...settingsToSave };
       const res = await fetch(`/api/marketing/tenants/${tenantId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -136,7 +147,7 @@ export default function LeadGenList({
     }
 
     // Generate with overrides so the route has the data immediately
-    doGenerate({ industry: profile.industry, city: profile.city, province: profile.province });
+    doGenerate({ industry: profile.industry, city: profile.city, province: profile.province, additional_details: profile.additional_details });
   }
 
   /* ── Update lead status ─────────────────────────────────────── */
@@ -346,21 +357,35 @@ export default function LeadGenList({
       {/* ── Lead cards ─────────────────────────────────────────── */}
       {!generating && filteredLeads.length > 0 && (
         <div className="space-y-3">
-          {filteredLeads.map((lead) => (
-            <LeadCard
-              key={lead.id}
-              lead={lead}
-              expanded={expandedId === lead.id}
-              updating={updatingId === lead.id}
-              onToggle={() =>
-                setExpandedId(expandedId === lead.id ? null : lead.id)
-              }
-              onStatusChange={(s) => handleStatusChange(lead.id, s)}
-              onDelete={() => handleDelete(lead.id)}
-              onSaveNotes={(n) => handleSaveNotes(lead.id, n)}
-            />
-          ))}
+          {filteredLeads.map((lead, idx) => {
+            const isLocked = isFree && idx >= FREE_VISIBLE_LEADS;
+
+            if (isLocked) return null; // blurred overlay handles these below
+
+            return (
+              <LeadCard
+                key={lead.id}
+                lead={lead}
+                expanded={expandedId === lead.id}
+                updating={updatingId === lead.id}
+                onToggle={() =>
+                  setExpandedId(expandedId === lead.id ? null : lead.id)
+                }
+                onStatusChange={(s) => handleStatusChange(lead.id, s)}
+                onDelete={() => handleDelete(lead.id)}
+                onSaveNotes={(n) => handleSaveNotes(lead.id, n)}
+              />
+            );
+          })}
         </div>
+      )}
+
+      {/* ── Blurred leads paywall (free users) ───────────────── */}
+      {!generating && isFree && filteredLeads.length > FREE_VISIBLE_LEADS && (
+        <LockedLeadsOverlay
+          lockedCount={filteredLeads.length - FREE_VISIBLE_LEADS}
+          leads={filteredLeads.slice(FREE_VISIBLE_LEADS)}
+        />
       )}
 
       {!generating && total > 0 && filteredLeads.length === 0 && (
@@ -386,13 +411,14 @@ function ProfileModal({
   onClose,
 }: {
   initialValues: { industry: string; city: string; province: string; target_market: string };
-  onSubmit: (profile: { industry: string; city: string; province: string; target_market: string }) => void;
+  onSubmit: (profile: { industry: string; city: string; province: string; target_market: string; additional_details: string }) => void;
   onClose: () => void;
 }) {
   const [industry, setIndustry] = useState(initialValues.industry);
   const [city, setCity] = useState(initialValues.city);
   const [province, setProvince] = useState(initialValues.province);
   const [targetMarket, setTargetMarket] = useState(initialValues.target_market);
+  const [additionalDetails, setAdditionalDetails] = useState("");
 
   const canSubmit = industry.trim().length > 0 && (city.trim().length > 0 || province.trim().length > 0);
 
@@ -404,6 +430,7 @@ function ProfileModal({
       city: city.trim(),
       province: province.trim(),
       target_market: targetMarket.trim(),
+      additional_details: additionalDetails.trim(),
     });
   }
 
@@ -498,6 +525,21 @@ function ProfileModal({
             <p className="mt-1 text-xs text-muted">What types of businesses are you trying to reach?</p>
           </div>
 
+          {/* Additional details */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Additional Details
+            </label>
+            <textarea
+              value={additionalDetails}
+              onChange={(e) => setAdditionalDetails(e.target.value)}
+              placeholder="e.g. Looking for companies that need website redesigns, or businesses expanding into Gauteng"
+              rows={3}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted/50 focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600 resize-none"
+            />
+            <p className="mt-1 text-xs text-muted">Describe the kind of leads you&apos;re looking for — the more specific, the better.</p>
+          </div>
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={onClose}>
@@ -535,6 +577,101 @@ function FilterButton({
     >
       {label}
     </button>
+  );
+}
+
+/* ── Blurred paywall overlay for free users ────────────────── */
+
+function LockedLeadsOverlay({
+  lockedCount,
+  leads,
+}: {
+  lockedCount: number;
+  leads: GeneratedLead[];
+}) {
+  const router = useRouter();
+
+  return (
+    <div className="relative mt-3">
+      {/* Blurred preview cards */}
+      <div className="space-y-3 select-none pointer-events-none" aria-hidden>
+        {leads.slice(0, 3).map((lead) => (
+          <Card key={lead.id} className="blur-[6px] opacity-60">
+            <div className="flex items-center gap-4">
+              <Badge variant="default" className="tabular-nums">
+                {lead.relevance_score}/100
+              </Badge>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate font-semibold text-foreground">
+                  {lead.company_name}
+                </h3>
+                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted">
+                  {lead.company_industry && (
+                    <span className="flex items-center gap-1">
+                      <Building2 className="h-3 w-3" />
+                      {lead.company_industry}
+                    </span>
+                  )}
+                  {(lead.company_city || lead.company_province) && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {[lead.company_city, lead.company_province].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-muted">{lead.match_reason}</p>
+          </Card>
+        ))}
+        {lockedCount > 3 && (
+          <Card className="blur-[6px] opacity-40 py-6 text-center">
+            <p className="text-sm text-muted">
+              +{lockedCount - 3} more matching leads…
+            </p>
+          </Card>
+        )}
+      </div>
+
+      {/* Upgrade overlay */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="mx-4 w-full max-w-md rounded-2xl border border-copper-600/30 bg-surface/95 backdrop-blur-sm p-8 shadow-2xl text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-copper-600/10">
+            <Lock className="h-7 w-7 text-copper-light" />
+          </div>
+          <h3 className="text-lg font-bold text-foreground">
+            Unlock {lockedCount} More Lead{lockedCount !== 1 ? "s" : ""}
+          </h3>
+          <p className="mt-2 text-sm text-muted">
+            Upgrade to <span className="font-semibold text-copper-light">Lalela Premium</span> to
+            see all your matched leads with full contact details and AI-crafted
+            outreach suggestions.
+          </p>
+          <ul className="mx-auto mt-4 max-w-sm space-y-2 text-left text-sm text-muted">
+            <li className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-copper-light shrink-0" />
+              <span>See <strong className="text-foreground">all leads</strong> — no blur</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-copper-light shrink-0" />
+              <span>Up to <strong className="text-foreground">500 leads/month</strong></span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-copper-light shrink-0" />
+              <span>Full contact details &amp; outreach messages</span>
+            </li>
+          </ul>
+          <Button
+            className="mt-6 w-full"
+            onClick={() => router.push("/marketing/billing")}
+          >
+            <Crown className="h-4 w-4" />
+            Upgrade to Premium — R300/mo
+          </Button>
+          <p className="mt-2 text-xs text-muted">Cancel anytime. No commitment.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 

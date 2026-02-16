@@ -26,6 +26,7 @@ import {
   Swords,
   MessageSquare,
   Sparkles,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase-browser";
@@ -98,6 +99,7 @@ const tenantNavigation: (NavItem | NavGroup)[] = [
   { label: "Competitors", href: "/marketing/competitors", icon: Swords },
   { label: "Campaigns", href: "/marketing/campaigns", icon: Target },
   { label: "Lead Gen", href: "/marketing/leads", icon: Sparkles },
+  { label: "Billing", href: "/marketing/billing", icon: CreditCard },
   { label: "Chat History", href: "/marketing/chat", icon: MessageSquare },
 ];
 

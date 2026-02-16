@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, Zap, ArrowRight, ArrowLeft, Loader2, CheckCircle2, BarChart3 } from "lucide-react";
+import { Globe, Zap, ArrowRight, ArrowLeft, Loader2, CheckCircle2, BarChart3, Crown, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase-browser";
 
 const INDUSTRIES = [
@@ -64,7 +64,6 @@ export default function OnboardingWizard({ tenantId, tenantName }: OnboardingPro
 
     setError("");
     setLoading(true);
-    setStep(3);
     setAuditProgress("Saving your details...");
 
     try {
@@ -161,7 +160,7 @@ export default function OnboardingWizard({ tenantId, tenantName }: OnboardingPro
     <div className="mx-auto max-w-2xl">
       {/* Progress indicator */}
       <div className="mb-8 flex items-center justify-center gap-2">
-        {[1, 2, 3].map((s) => (
+        {[1, 2, 3, 4].map((s) => (
           <div key={s} className="flex items-center gap-2">
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors ${
@@ -172,7 +171,7 @@ export default function OnboardingWizard({ tenantId, tenantName }: OnboardingPro
             >
               {step > s ? <CheckCircle2 className="h-4 w-4" /> : s}
             </div>
-            {s < 3 && (
+            {s < 4 && (
               <div
                 className={`h-0.5 w-12 rounded-full transition-colors ${
                   step > s ? "bg-copper-600" : "bg-border"
@@ -304,40 +303,196 @@ export default function OnboardingWizard({ tenantId, tenantName }: OnboardingPro
               Back
             </button>
             <button
-              onClick={handleStartAudit}
-              disabled={loading}
+              onClick={() => setStep(3)}
               className="flex items-center gap-2 rounded-lg bg-copper-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-copper-700 disabled:opacity-50"
             >
-              <Zap className="h-4 w-4" />
-              Generate My Audit
+              Next
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 3: Generating Audit */}
+      {/* Step 3: Plan Selection */}
       {step === 3 && (
-        <div className="space-y-6 text-center">
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-copper-600/10">
-            {loading ? (
-              <Loader2 className="h-10 w-10 animate-spin text-copper-light" />
-            ) : auditId ? (
-              <CheckCircle2 className="h-10 w-10 text-success" />
-            ) : (
-              <Zap className="h-10 w-10 text-copper-light" />
-            )}
+        <div className="space-y-6">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-copper-600/10">
+              <CreditCard className="h-8 w-8 text-copper-light" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground">
+              Choose your plan
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Start free or unlock the full power of Lalela with Premium.
+            </p>
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold text-foreground">
-              {loading
-                ? "Analyzing your website..."
-                : auditId
-                  ? "Audit Complete!"
-                  : "Preparing your audit..."}
-            </h2>
-            <p className="mt-2 text-sm text-muted">{auditProgress}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Free plan */}
+            <div className="rounded-xl border border-border bg-surface-elevated p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Free</h3>
+                <p className="text-2xl font-bold text-foreground mt-1">
+                  R0<span className="text-sm font-normal text-muted">/month</span>
+                </p>
+              </div>
+              <ul className="space-y-2 text-sm text-muted">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                  Website audit &amp; report
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                  Platform connections
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                  Competitor analysis
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                  3 visible leads per batch
+                </li>
+              </ul>
+              <button
+                onClick={() => setStep(4)}
+                className="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover"
+              >
+                Continue Free
+              </button>
+            </div>
+
+            {/* Premium plan */}
+            <div className="relative rounded-xl border-2 border-copper-600 bg-surface-elevated p-6 space-y-4">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-copper-600 px-3 py-0.5 text-xs font-bold text-white">
+                Recommended
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-copper-light" />
+                  Premium
+                </h3>
+                <p className="text-2xl font-bold text-foreground mt-1">
+                  R300<span className="text-sm font-normal text-muted">/month</span>
+                </p>
+              </div>
+              <ul className="space-y-2 text-sm text-muted">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-copper-light shrink-0" />
+                  Everything in Free
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-copper-light shrink-0" />
+                  <strong className="text-foreground">All leads unlocked</strong> — no blur
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-copper-light shrink-0" />
+                  Up to <strong className="text-foreground">500 leads/month</strong>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-copper-light shrink-0" />
+                  Full contact details &amp; outreach
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-copper-light shrink-0" />
+                  Priority support
+                </li>
+              </ul>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/marketing/billing/checkout", { method: "POST" });
+                    const data = await res.json();
+                    if (data.url) {
+                      window.location.href = data.url;
+                    } else {
+                      setError(data.error || "Checkout failed");
+                    }
+                  } catch {
+                    setError("Could not start checkout. Please try again.");
+                  }
+                }}
+                className="w-full rounded-lg bg-copper-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-copper-700"
+              >
+                Upgrade Now
+              </button>
+            </div>
           </div>
+
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setStep(2)}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-muted transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <button
+              onClick={() => setStep(4)}
+              className="text-sm text-muted transition-colors hover:text-foreground underline"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Generating Audit */}
+      {step === 4 && (
+        <div className="space-y-6 text-center">
+          {!loading && !auditId && (
+            <div className="space-y-4">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-copper-600/10">
+                <Zap className="h-10 w-10 text-copper-light" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">
+                Ready to generate your audit?
+              </h2>
+              <p className="text-sm text-muted">
+                We&apos;ll analyze your website and generate a comprehensive report
+                with insights and recommendations.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setStep(3)}
+                  className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-muted transition-colors hover:text-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </button>
+                <button
+                  onClick={handleStartAudit}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-lg bg-copper-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-copper-700 disabled:opacity-50"
+                >
+                  <Zap className="h-4 w-4" />
+                  Generate My Audit
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(loading || auditId) && (
+            <>
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-copper-600/10">
+                {loading ? (
+                  <Loader2 className="h-10 w-10 animate-spin text-copper-light" />
+                ) : (
+                  <CheckCircle2 className="h-10 w-10 text-success" />
+                )}
+              </div>
+
+              <div>
+                <h2 className="text-xl font-bold text-foreground">
+                  {loading
+                    ? "Analyzing your website..."
+                    : "Audit Complete!"}
+                </h2>
+                <p className="mt-2 text-sm text-muted">{auditProgress}</p>
+              </div>
+            </>
+          )}
 
           {/* Progress steps */}
           {loading && (

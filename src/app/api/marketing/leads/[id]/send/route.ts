@@ -83,6 +83,9 @@ export async function POST(
       toName: displayName,
       subject,
       htmlContent: html,
+      // Route replies through Cloudmailin so our inbound webhook picks them up.
+      // Falls back to sender address if not configured.
+      replyTo: process.env.CLOUDMAILIN_ADDRESS ?? undefined,
     });
 
     // Mark as contacted

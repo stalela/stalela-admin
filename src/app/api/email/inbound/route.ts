@@ -5,30 +5,34 @@ import { createLeadGenApi } from "@stalela/commons/lead-gen";
 /**
  * POST /api/email/inbound
  *
- * Brevo Inbound Email Parsing webhook.
- * Fired whenever someone replies to an outreach email sent to an address on
- * your inbound subdomain (e.g. replies@inbound.stalela.com).
+ * Cloudmailin inbound email webhook.
+ * Fired whenever someone replies to an outreach email addressed to your
+ * Cloudmailin target address (e.g. xxxxx@cloudmailin.net or a custom
+ * subdomain configured via Custom MX in your registrar).
  *
  * Flow:
- *  1. Validate optional BREVO_INBOUND_SECRET via ?secret= query param
- *  2. Parse Brevo JSON payload → extract sender + body
- *  3. Look up the sender email in generated_leads
+ *  1. Validate optional INBOUND_WEBHOOK_SECRET via ?secret= query param
+ *  2. Parse Cloudmailin JSON payload → extract sender + body
+ *  3. Look up sender email in generated_leads (service-role, all tenants)
  *  4. Call DashScope Qwen to draft a contextual reply
  *  5. Insert into email_threads (status = "pending_review")
- *  6. Return 200 immediately (Brevo retries on non-2xx)
+ *  6. Return 200 immediately (Cloudmailin retries on non-2xx)
  *
- * Brevo Inbound JSON fields used:
- *   FromFull  { Name, Address }   — sender
- *   From      "Name <email>"      — fallback
- *   Subject   string
- *   RawTextBody  string           — plain text body
- *   TextBody     string           — fallback
+ * Cloudmailin JSON shape (multipart format):
+ *   envelope.from          — sender email
+ *   headers.From           — "Name <email>" string
+ *   headers.Subject        — subject line
+ *   body.reply_plain       — reply text with quoted history stripped  ← preferred
+ *   body.plain             — full plain-text body (fallback)
  */
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
 
-const BREVO_INBOUND_SECRET = process.env.BREVO_INBOUND_SECRET ?? null;
+const INBOUND_WEBHOOK_SECRET =
+  process.env.INBOUND_WEBHOOK_SECRET ??
+  process.env.BREVO_INBOUND_SECRET ??   // backward compat
+  null;
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY;
 const DASHSCOPE_BASE_URL =
   "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
@@ -73,12 +77,12 @@ function parseFrom(
 }
 
 export async function POST(request: NextRequest) {
-  // ── Secret validation (optional) ──────────────────────────────────
-  if (BREVO_INBOUND_SECRET) {
+  // ── Secret validation (optional) ────────────────────────────────
+  if (INBOUND_WEBHOOK_SECRET) {
     const secret =
       request.nextUrl.searchParams.get("secret") ??
-      request.headers.get("x-brevo-token");
-    if (secret !== BREVO_INBOUND_SECRET) {
+      request.headers.get("x-webhook-token");
+    if (secret !== INBOUND_WEBHOOK_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
@@ -87,46 +91,53 @@ export async function POST(request: NextRequest) {
   try {
     payload = (await request.json()) as Record<string, unknown>;
   } catch {
-    // Brevo may send form-encoded — fall back gracefully
     return NextResponse.json({ ok: true });
   }
 
-  // ── Parse sender ────────────────────────────────────────────────
-  const fromFull = payload.FromFull as
-    | { Name?: string; Address?: string }
-    | null
-    | undefined;
-  const fromStr = (payload.From ?? payload.from) as string | undefined;
-  const { email: fromEmail, name: fromName } = parseFrom(fromFull, fromStr);
+  // ── Parse Cloudmailin payload ────────────────────────────────────
+  // Shape: { envelope: { from }, headers: { From, Subject }, body: { plain, reply_plain } }
+  const envelope = payload.envelope as Record<string, string> | undefined;
+  const headers  = payload.headers  as Record<string, string> | undefined;
+  const body     = payload.body     as Record<string, string> | undefined;
+
+  // Sender email — prefer envelope.from (always clean), fall back to headers.From
+  const rawFrom = envelope?.from ?? headers?.From ?? (payload.From as string) ?? "";
+  const { email: fromEmail, name: fromName } = parseFrom(null, rawFrom);
+
+  // If headers.From has a display name, use it
+  const nameFromHeader = headers?.From ? parseFrom(null, headers.From).name : null;
+  const resolvedName = nameFromHeader ?? fromName;
 
   if (!fromEmail) {
-    console.error("[inbound] Could not parse sender email from payload", payload);
-    return NextResponse.json({ ok: true }); // don't let Brevo retry forever
+    console.error("[inbound] Could not parse sender email", payload);
+    return NextResponse.json({ ok: true });
   }
 
-  const subject = ((payload.Subject ?? payload.subject) as string) || null;
-  const bodyText =
-    ((payload.RawTextBody ??
-      payload.TextBody ??
-      payload.text ??
-      payload.body_text) as string) || null;
+  const subject = headers?.Subject ?? (payload.Subject as string) ?? null;
 
-  // ── Look up lead ────────────────────────────────────────────────
+  // reply_plain has quoted history stripped — much cleaner for AI context
+  const bodyText = (
+    body?.reply_plain ??
+    body?.plain ??
+    (payload.RawTextBody as string) ??
+    (payload.TextBody as string) ??
+    null
+  );
+
+  // ── Look up lead ─────────────────────────────────────────────────
   const supabase = createAdminClient();
   const leadGenApi = createLeadGenApi(supabase);
 
-  let lead: Awaited<ReturnType<typeof leadGenApi.list>>["leads"][number] | null =
-    null;
+  let lead: Awaited<ReturnType<typeof leadGenApi.list>>["leads"][number] | null = null;
   let tenantId: string | null = null;
 
   try {
-    // Search all tenants for this email (service-role, safe)
     const { data: matches } = await (
       supabase as unknown as {
         from: (t: string) => {
-          select: (
-            cols: string
-          ) => { ilike: (col: string, val: string) => Promise<{ data: Array<{ id: string; tenant_id: string }> }> };
+          select: (cols: string) => {
+            ilike: (col: string, val: string) => Promise<{ data: Array<{ id: string; tenant_id: string }> }>;
+          };
         };
       }
     )
@@ -143,7 +154,7 @@ export async function POST(request: NextRequest) {
     console.error("[inbound] Lead lookup failed:", err);
   }
 
-  // ── AI draft reply ────────────────────────────────────────────
+  // ── AI draft reply ───────────────────────────────────────────────
   let aiDraft: string | null = null;
 
   if (DASHSCOPE_API_KEY && bodyText) {
@@ -190,7 +201,6 @@ export async function POST(request: NextRequest) {
           choices?: Array<{ message?: { content?: string } }>;
         };
         aiDraft = dsData.choices?.[0]?.message?.content?.trim() ?? null;
-        // Strip <think>...</think> tags that qwen3 sometimes emits
         if (aiDraft) {
           aiDraft = aiDraft.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
         }
@@ -202,7 +212,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Insert thread ────────────────────────────────────────────
+  // ── Insert thread ────────────────────────────────────────────────
   try {
     await (
       supabase as unknown as {
@@ -216,7 +226,7 @@ export async function POST(request: NextRequest) {
         tenant_id: tenantId,
         lead_id: lead?.id ?? null,
         from_email: fromEmail,
-        from_name: fromName,
+        from_name: resolvedName,
         subject,
         body_text: bodyText?.slice(0, 5000) ?? null,
         ai_draft: aiDraft,

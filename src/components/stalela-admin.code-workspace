@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../stalela-commons"
+		},
+		{
+			"path": "../../../website"
+		},
+		{
+			"path": "../../../leoads-mirror"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "stalela-admin"
+	}
+}

@@ -18,6 +18,11 @@ import {
   X,
   Lock,
   Crown,
+  Wand2,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+  MessageSquarePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/Button";
@@ -81,6 +86,8 @@ export default function LeadGenList({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentId, setSentId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [savedSettings, setSavedSettings] = useState(tenantSettings);
 
@@ -185,6 +192,51 @@ export default function LeadGenList({
       setError("Failed to delete lead");
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  /* ── Send email via Brevo ──────────────────────────────────── */
+  async function handleSendEmail(leadId: string, to: string, toName: string, customBody?: string) {
+    setSendingId(leadId);
+    try {
+      const res = await fetch(`/api/marketing/leads/${leadId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, toName, customBody }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "Failed to send");
+      }
+      // Optimistically mark as contacted
+      setLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, status: "contacted" as const } : l))
+      );
+      setSentId(leadId);
+      setTimeout(() => setSentId(null), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send email");
+    } finally {
+      setSendingId(null);
+    }
+  }
+
+  /* ── Update outreach draft (from AI refine) ─────────────────── */
+  async function handleUpdateDraft(leadId: string, newDraft: string) {
+    try {
+      await fetch("/api/marketing/leads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, notes: leads.find(l => l.id === leadId)?.notes }),
+      });
+      // We don't persist outreach_suggestion via PATCH (no field in schema) — store locally
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === leadId ? { ...l, outreach_suggestion: newDraft } : l
+        )
+      );
+    } catch {
+      /* best-effort */
     }
   }
 
@@ -368,12 +420,16 @@ export default function LeadGenList({
                 lead={lead}
                 expanded={expandedId === lead.id}
                 updating={updatingId === lead.id}
+                sending={sendingId === lead.id}
+                sent={sentId === lead.id}
                 onToggle={() =>
                   setExpandedId(expandedId === lead.id ? null : lead.id)
                 }
                 onStatusChange={(s) => handleStatusChange(lead.id, s)}
                 onDelete={() => handleDelete(lead.id)}
                 onSaveNotes={(n) => handleSaveNotes(lead.id, n)}
+                onSendEmail={(to, toName, body) => handleSendEmail(lead.id, to, toName, body)}
+                onUpdateDraft={(draft) => handleUpdateDraft(lead.id, draft)}
               />
             );
           })}
@@ -679,22 +735,95 @@ function LeadCard({
   lead,
   expanded,
   updating,
+  sending,
+  sent,
   onToggle,
   onStatusChange,
   onDelete,
   onSaveNotes,
+  onSendEmail,
+  onUpdateDraft,
 }: {
   lead: GeneratedLead;
   expanded: boolean;
   updating: boolean;
+  sending: boolean;
+  sent: boolean;
   onToggle: () => void;
   onStatusChange: (s: GeneratedLeadStatus) => void;
   onDelete: () => void;
   onSaveNotes: (notes: string) => void;
+  onSendEmail: (to: string, toName: string, body?: string) => void;
+  onUpdateDraft: (draft: string) => void;
 }) {
   const statusOption = STATUS_OPTIONS.find((s) => s.value === lead.status);
   const [notes, setNotes] = useState(lead.notes || "");
   const [notesDirty, setNotesDirty] = useState(false);
+
+  // AI refine panel
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [aiDraft, setAiDraft] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // Send email panel
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [manualEmail, setManualEmail] = useState("");
+
+  async function handleAiSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!aiInput.trim() || aiLoading) return;
+    setAiLoading(true);
+    setAiResponse(null);
+    setAiDraft(null);
+    setAiError(null);
+    try {
+      const res = await fetch(`/api/marketing/leads/${lead.id}/enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: aiInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "AI request failed");
+      setAiResponse(data.response);
+      setAiDraft(data.updatedDraft ?? null);
+      setAiInput("");
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function handleApplyDraft() {
+    if (aiDraft) {
+      onUpdateDraft(aiDraft);
+      setAiDraft(null);
+      setAiResponse(null);
+    }
+  }
+
+  function handleSendClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    const to = lead.company_email;
+    if (to) {
+      onSendEmail(to, lead.company_name, lead.outreach_suggestion ?? undefined);
+    } else {
+      setShowEmailInput(true);
+    }
+  }
+
+  function handleManualSend(e: React.FormEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!manualEmail.trim()) return;
+    onSendEmail(manualEmail.trim(), lead.company_name, lead.outreach_suggestion ?? undefined);
+    setShowEmailInput(false);
+    setManualEmail("");
+  }
 
   return (
     <Card className={cn("transition-all", updating && "opacity-60")}>
@@ -803,12 +932,89 @@ function LeadCard({
           {/* Outreach suggestion */}
           {lead.outreach_suggestion && (
             <div className="rounded-lg border border-copper-600/20 bg-copper-600/5 p-4">
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-copper-light">
-                Suggested Outreach
-              </h4>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-copper-light">
+                  Suggested Outreach
+                </h4>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setAiOpen((v) => !v); }}
+                  className={cn(
+                    "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    aiOpen
+                      ? "bg-copper-600/20 text-copper-light"
+                      : "text-muted hover:text-copper-light hover:bg-copper-600/10"
+                  )}
+                >
+                  <Wand2 className="h-3 w-3" />
+                  Refine with AI
+                </button>
+              </div>
               <p className="text-sm text-foreground leading-relaxed">
                 {lead.outreach_suggestion}
               </p>
+
+              {/* ── AI Refine Panel ─────────────────────────────── */}
+              {aiOpen && (
+                <div
+                  className="mt-3 rounded-lg border border-border bg-background p-3"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <form onSubmit={handleAiSubmit} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      placeholder="e.g. Make it more formal, research their latest news, mention payment solutions…"
+                      disabled={aiLoading}
+                      className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600 disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={aiLoading || !aiInput.trim()}
+                      className="flex shrink-0 items-center gap-1.5 rounded-md bg-copper-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-600/80 disabled:opacity-50"
+                    >
+                      {aiLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <MessageSquarePlus className="h-3.5 w-3.5" />
+                      )}
+                      {aiLoading ? "Thinking…" : "Ask"}
+                    </button>
+                  </form>
+
+                  {aiError && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-danger">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      {aiError}
+                    </div>
+                  )}
+
+                  {aiResponse && (
+                    <div className="mt-3 space-y-3">
+                      <div className="rounded-md bg-surface/60 p-3">
+                        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">AI Response</p>
+                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{aiResponse}</p>
+                      </div>
+
+                      {aiDraft && (
+                        <div className="rounded-md border border-copper-600/30 bg-copper-600/5 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-xs font-semibold text-copper-light uppercase tracking-wider">Updated Draft</p>
+                            <button
+                              onClick={handleApplyDraft}
+                              className="flex items-center gap-1 rounded-md bg-copper-600/20 px-2 py-1 text-xs font-medium text-copper-light transition-colors hover:bg-copper-600/30"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Apply this draft
+                            </button>
+                          </div>
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{aiDraft}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -836,6 +1042,40 @@ function LeadCard({
             />
           </div>
 
+          {/* Send email inline input (when no company_email) */}
+          {showEmailInput && (
+            <form
+              onSubmit={handleManualSend}
+              onClick={(e) => e.stopPropagation()}
+              className="flex gap-2 rounded-lg border border-border bg-background p-3"
+            >
+              <Mail className="mt-2 h-4 w-4 shrink-0 text-muted" />
+              <input
+                type="email"
+                value={manualEmail}
+                onChange={(e) => setManualEmail(e.target.value)}
+                placeholder="Enter recipient email address…"
+                autoFocus
+                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-muted/50 focus:border-copper-600 focus:outline-none focus:ring-1 focus:ring-copper-600"
+              />
+              <button
+                type="submit"
+                disabled={!manualEmail.trim() || sending}
+                className="flex items-center gap-1.5 rounded-md bg-copper-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-copper-600/80 disabled:opacity-50"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Send
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowEmailInput(false); }}
+                className="rounded-md px-2 py-1.5 text-xs text-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </form>
+          )}
+
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted">Status:</span>
@@ -858,7 +1098,28 @@ function LeadCard({
               </button>
             ))}
 
-            <div className="ml-auto">
+            {/* Send Email button */}
+            <div className="ml-auto flex items-center gap-2">
+              {sent ? (
+                <span className="flex items-center gap-1 text-xs text-success font-medium">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Email sent
+                </span>
+              ) : (
+                <button
+                  onClick={handleSendClick}
+                  disabled={sending || updating}
+                  className="flex items-center gap-1.5 rounded-md border border-copper-600/40 bg-copper-600/10 px-3 py-1 text-xs font-medium text-copper-light transition-colors hover:bg-copper-600/20 disabled:opacity-50"
+                >
+                  {sending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Send className="h-3 w-3" />
+                  )}
+                  {sending ? "Sending…" : "Send Email"}
+                </button>
+              )}
+
               <button
                 onClick={(e) => {
                   e.stopPropagation();

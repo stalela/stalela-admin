@@ -39,11 +39,11 @@ export function buildEmailHtml({
           <tr>
             <td style="background:linear-gradient(135deg,#0a0a0c 0%,#1a1a22 100%);padding:24px 32px;text-align:center;">
               <img
-                src="https://hwfhtdlbtjhmwzyvejxd.supabase.co/storage/v1/object/public/assets/brand/logo.svg"
+                src="https://hwfhtdlbtjhmwzyvejxd.supabase.co/storage/v1/object/public/assets/brand/logo.png"
                 alt="Stalela"
-                width="180"
-                height="50"
-                style="display:block;margin:0 auto;"
+                width="360"
+                height="100"
+                style="display:block;margin:0 auto;width:180px;height:50px;"
               />
             </td>
           </tr>

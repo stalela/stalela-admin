@@ -23,12 +23,16 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageSquarePlus,
+  Reply,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { Card } from "@/components/Card";
 import type { GeneratedLead, GeneratedLeadStatus } from "@stalela/commons/types";
+import type { EmailThreadRow } from "@/app/api/email/threads/route";
 
 /** Matches FREE_VISIBLE_LEADS in src/lib/stripe.ts */
 const FREE_VISIBLE_LEADS = 3;
@@ -69,6 +73,7 @@ export default function LeadGenList({
   tenantSettings,
   tenantPlan = "free",
   monthlyUsage = 0,
+  initialThreads = [],
 }: {
   initialLeads: GeneratedLead[];
   initialTotal: number;
@@ -76,6 +81,7 @@ export default function LeadGenList({
   tenantSettings: Record<string, unknown>;
   tenantPlan?: string;
   monthlyUsage?: number;
+  initialThreads?: EmailThreadRow[];
 }) {
   const isFree = tenantPlan !== "premium" && tenantPlan !== "enterprise";
   const router = useRouter();
@@ -88,6 +94,8 @@ export default function LeadGenList({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentId, setSentId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<EmailThreadRow[]>(initialThreads);
+  const [sendingThreadId, setSendingThreadId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [savedSettings, setSavedSettings] = useState(tenantSettings);
 
@@ -218,6 +226,51 @@ export default function LeadGenList({
       setError(e instanceof Error ? e.message : "Failed to send email");
     } finally {
       setSendingId(null);
+    }
+  }
+
+  /* ── Email thread handlers ─────────────────────────────────── */
+  async function handleSendThread(threadId: string) {
+    setSendingThreadId(threadId);
+    try {
+      const res = await fetch(`/api/email/threads/${threadId}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "Failed to send");
+      }
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send reply");
+    } finally {
+      setSendingThreadId(null);
+    }
+  }
+
+  async function handleDismissThread(threadId: string) {
+    try {
+      const res = await fetch(`/api/email/threads/${threadId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to dismiss");
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  async function handleUpdateThreadDraft(threadId: string, draft: string) {
+    // Optimistic update
+    setThreads((prev) =>
+      prev.map((t) => (t.id === threadId ? { ...t, ai_draft: draft } : t))
+    );
+    try {
+      await fetch(`/api/email/threads/${threadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_draft: draft }),
+      });
+    } catch {
+      /* best-effort */
     }
   }
 
@@ -422,6 +475,8 @@ export default function LeadGenList({
                 updating={updatingId === lead.id}
                 sending={sendingId === lead.id}
                 sent={sentId === lead.id}
+                threads={threads.filter((t) => t.lead_id === lead.id)}
+                sendingThreadId={sendingThreadId}
                 onToggle={() =>
                   setExpandedId(expandedId === lead.id ? null : lead.id)
                 }
@@ -430,6 +485,9 @@ export default function LeadGenList({
                 onSaveNotes={(n) => handleSaveNotes(lead.id, n)}
                 onSendEmail={(to, toName, body) => handleSendEmail(lead.id, to, toName, body)}
                 onUpdateDraft={(draft) => handleUpdateDraft(lead.id, draft)}
+                onSendThread={handleSendThread}
+                onDismissThread={handleDismissThread}
+                onUpdateThreadDraft={handleUpdateThreadDraft}
               />
             );
           })}
@@ -737,24 +795,34 @@ function LeadCard({
   updating,
   sending,
   sent,
+  threads,
+  sendingThreadId,
   onToggle,
   onStatusChange,
   onDelete,
   onSaveNotes,
   onSendEmail,
   onUpdateDraft,
+  onSendThread,
+  onDismissThread,
+  onUpdateThreadDraft,
 }: {
   lead: GeneratedLead;
   expanded: boolean;
   updating: boolean;
   sending: boolean;
   sent: boolean;
+  threads: EmailThreadRow[];
+  sendingThreadId: string | null;
   onToggle: () => void;
   onStatusChange: (s: GeneratedLeadStatus) => void;
   onDelete: () => void;
   onSaveNotes: (notes: string) => void;
   onSendEmail: (to: string, toName: string, body?: string) => void;
   onUpdateDraft: (draft: string) => void;
+  onSendThread: (id: string) => void;
+  onDismissThread: (id: string) => void;
+  onUpdateThreadDraft: (id: string, draft: string) => void;
 }) {
   const statusOption = STATUS_OPTIONS.find((s) => s.value === lead.status);
   const [notes, setNotes] = useState(lead.notes || "");
@@ -771,6 +839,10 @@ function LeadCard({
   // Send email panel
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [manualEmail, setManualEmail] = useState("");
+
+  // Thread reply editing
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
 
   async function handleAiSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -870,6 +942,14 @@ function LeadCard({
           {statusOption?.label || lead.status}
         </Badge>
 
+        {/* Pending reply indicator */}
+        {threads.length > 0 && (
+          <span className="flex items-center gap-1 rounded-full bg-vibranium/20 px-2 py-0.5 text-xs font-medium text-vibranium border border-vibranium/30">
+            <Reply className="h-3 w-3" />
+            {threads.length}
+          </span>
+        )}
+
         {/* Expand toggle */}
         <div className="text-muted">
           {expanded ? (
@@ -886,6 +966,134 @@ function LeadCard({
       {/* ── Expanded detail ────────────────────────────────────── */}
       {expanded && (
         <div className="mt-4 space-y-4 border-t border-border pt-4">
+
+          {/* ── Pending Reply threads ───────────────────────────── */}
+          {threads.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-vibranium">
+                <Reply className="h-3.5 w-3.5" />
+                Pending Repl{threads.length === 1 ? "y" : "ies"} — review AI draft before sending
+              </h4>
+              {threads.map((thread) => {
+                const isEditing = editingThreadId === thread.id;
+                const isSending = sendingThreadId === thread.id;
+                return (
+                  <div
+                    key={thread.id}
+                    className="rounded-lg border border-vibranium/30 bg-vibranium/5 p-4 space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Thread header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {thread.from_name
+                            ? `${thread.from_name} <${thread.from_email}>`
+                            : thread.from_email}
+                        </p>
+                        {thread.subject && (
+                          <p className="mt-0.5 text-xs text-muted truncate">{thread.subject}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => onDismissThread(thread.id)}
+                        className="shrink-0 rounded-md p-1 text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+                        title="Dismiss"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Their message */}
+                    {thread.body_text && (
+                      <div className="rounded-md bg-surface/60 p-3">
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">Their message</p>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap line-clamp-4">
+                          {thread.body_text}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* AI Draft Reply */}
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-vibranium">
+                          AI Draft Reply
+                        </p>
+                        <button
+                          onClick={() => {
+                            if (isEditing) {
+                              setEditingThreadId(null);
+                            } else {
+                              setEditingThreadId(thread.id);
+                              setEditingDraft(thread.ai_draft ?? "");
+                            }
+                          }}
+                          className="flex items-center gap-1 text-xs text-muted hover:text-foreground transition-colors"
+                        >
+                          {isEditing ? (
+                            <><EyeOff className="h-3 w-3" />Cancel edit</>
+                          ) : (
+                            <><Eye className="h-3 w-3" />Edit</>
+                          )}
+                        </button>
+                      </div>
+
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingDraft}
+                            onChange={(e) => setEditingDraft(e.target.value)}
+                            rows={5}
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted/50 focus:border-vibranium focus:outline-none focus:ring-1 focus:ring-vibranium resize-none"
+                          />
+                          <button
+                            onClick={() => {
+                              onUpdateThreadDraft(thread.id, editingDraft);
+                              setEditingThreadId(null);
+                            }}
+                            className="flex items-center gap-1.5 rounded-md bg-vibranium/20 px-3 py-1.5 text-xs font-medium text-vibranium hover:bg-vibranium/30 transition-colors"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Save draft
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                          {thread.ai_draft ?? (
+                            <span className="text-muted italic">No AI draft — edit manually before sending.</span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-border">
+                      <button
+                        onClick={() => onDismissThread(thread.id)}
+                        className="text-xs text-muted hover:text-danger transition-colors px-2 py-1"
+                      >
+                        Dismiss
+                      </button>
+                      <button
+                        onClick={() => onSendThread(thread.id)}
+                        disabled={isSending || !thread.ai_draft}
+                        className="flex items-center gap-1.5 rounded-md bg-vibranium px-3 py-1.5 text-xs font-medium text-white hover:bg-vibranium/80 disabled:opacity-50 transition-colors"
+                      >
+                        {isSending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Send className="h-3 w-3" />
+                        )}
+                        {isSending ? "Sending…" : "Send Reply"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Contact details */}
           <div className="grid gap-3 sm:grid-cols-3">
             {lead.company_website && (

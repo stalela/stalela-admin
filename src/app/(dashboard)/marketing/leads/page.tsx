@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import { getTenantContext, isTenantUser } from "@/lib/tenant-context";
 import { leadGenApi, tenantsApi } from "@/lib/api";
+import { createAdminClient } from "@stalela/commons/client";
 import LeadGenList from "@/components/LeadGenList";
 import type { GeneratedLead } from "@stalela/commons/types";
+import type { EmailThreadRow } from "@/app/api/email/threads/route";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,34 @@ export default async function LeadsPage() {
     // skip
   }
 
+  let pendingThreads: EmailThreadRow[] = [];
+  try {
+    const admin = createAdminClient();
+    const { data } = await (
+      admin as unknown as {
+        from: (t: string) => {
+          select: (c: string) => {
+            eq: (col: string, val: string) => {
+              eq: (col: string, val: string) => {
+                order: (col: string, opts: { ascending: boolean }) => Promise<{
+                  data: EmailThreadRow[] | null;
+                }>;
+              };
+            };
+          };
+        };
+      }
+    )
+      .from("email_threads")
+      .select("*")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("status", "pending_review")
+      .order("created_at", { ascending: false });
+    pendingThreads = data ?? [];
+  } catch {
+    // skip — table may not exist yet
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -62,6 +92,7 @@ export default async function LeadsPage() {
         tenantSettings={tenantSettings}
         tenantPlan={tenantPlan}
         monthlyUsage={monthlyUsage}
+        initialThreads={pendingThreads}
       />
     </div>
   );

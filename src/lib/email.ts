@@ -14,6 +14,10 @@ import { TransactionalEmailsApi, SendSmtpEmail } from "@getbrevo/brevo";
 const SENDER_NAME = "Stalela";
 const SENDER_EMAIL = "hello@stalela.com";
 
+/** ⚠️ TEST OVERRIDE — redirect ALL outgoing emails to this address.
+ *  Set to null (or remove) when ready for production. */
+const TEST_EMAIL_OVERRIDE = "kudzicloud@gmail.com";
+
 /* ── Lazy API client ──────────────────────────────────────────────── */
 
 let _api: TransactionalEmailsApi | undefined;
@@ -54,10 +58,14 @@ export interface SendEmailOptions {
 export async function sendEmail(opts: SendEmailOptions): Promise<void> {
   const api = getApi();
 
+  const recipient = TEST_EMAIL_OVERRIDE ?? opts.to;
+  const recipientName = TEST_EMAIL_OVERRIDE ? `[TEST] ${opts.toName ?? opts.to}` : opts.toName;
+  const subject = TEST_EMAIL_OVERRIDE ? `[TEST → ${opts.to}] ${opts.subject}` : opts.subject;
+
   const message = new SendSmtpEmail();
   message.sender = { name: SENDER_NAME, email: SENDER_EMAIL };
-  message.to = [{ email: opts.to, name: opts.toName }];
-  message.subject = opts.subject;
+  message.to = [{ email: recipient, name: recipientName }];
+  message.subject = subject;
   message.htmlContent = opts.htmlContent;
 
   if (opts.textContent) message.textContent = opts.textContent;

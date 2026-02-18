@@ -37,13 +37,14 @@ export function buildEmailHtml({
 
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#0a0a0c 0%,#1a1a22 100%);padding:28px 32px;text-align:center;">
-              <p style="margin:0 0 4px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:5px;">
-                STALELA
-              </p>
-              <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#d4a574;letter-spacing:2px;text-transform:uppercase;">
-                Business Services
-              </p>
+            <td style="background:linear-gradient(135deg,#0a0a0c 0%,#1a1a22 100%);padding:24px 32px;text-align:center;">
+              <img
+                src="https://hwfhtdlbtjhmwzyvejxd.supabase.co/storage/v1/object/public/assets/brand/logo.svg"
+                alt="Stalela"
+                width="180"
+                height="50"
+                style="display:block;margin:0 auto;"
+              />
             </td>
           </tr>
 

@@ -20,7 +20,6 @@ export function buildEmailHtml({
   const htmlBody = body
     .replace(/\n\n/g, "</p><p style=\"margin:0 0 12px 0;color:#333333;font-size:15px;line-height:1.6;\">")
     .replace(/\n/g, "<br>")
-    // Bold
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   return `<!DOCTYPE html>
@@ -38,24 +37,13 @@ export function buildEmailHtml({
 
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #0a0a0c 0%, #1a1a22 100%); padding: 28px 32px; text-align: center;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                <tr>
-                  <td align="center">
-                    <!-- Star icon (inline SVG as data URI) -->
-                    <img
-                      src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0gNzIgNTAgUSA3MiAzOCwgNjUgMzAiIHN0cm9rZT0iI0Q0QTU3NCIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuOSIvPjxwYXRoIGQ9Ik0gNzggNTAgUSA3OCAzNCwgNjggMjIiIHN0cm9rZT0iI0Q0QTU3NCIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIG9wYWNpdHk9IjAuNyIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDUwLCA1MCkiPjxwYXRoIGQ9Ik0gMCwtMjAgTCA1LC01IEwgMjAsMCBMIDUsNSBMIDAsMjAgTCAtNSw1IEwgLTIwLDAgTCAtNSwtNSBaIiBmaWxsPSIjRkZGRkZGIi8+PHBhdGggZD0iTSAxMiwtMTIgTCAxNCwtOCBMIDE4LC02IEwgMTQsLTQgTCAxMiwwIEwgMTAsLTQgTCA2LC02IEwgMTAsLTggWiIgZmlsbD0iI0Y1RjVGNSIvPjxwYXRoIGQ9Ik0gLTgsLTMgUSAtMTIsMCAtOCwzIiBzdHJva2U9IiNGNUY1RjUiIHN0cm9rZS13aWR0aD0iMi40IiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz48L2c+PHBhdGggZD0iTSAyOCA1MCBRIDI4IDYyLCAzNSA3MCIgc3Ryb2tlPSIjRDRBNTc0IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgb3BhY2l0eT0iMC45Ii8+PHBhdGggZD0iTSAyMiA1MCBRIDIyIDY2LCAzMiA3OCIgc3Ryb2tlPSIjRDRBNTc0IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgb3BhY2l0eT0iMC43Ii8+PC9zdmc+"
-                      alt="Stalela"
-                      width="40"
-                      height="40"
-                      style="display:block;margin:0 auto 8px;"
-                    />
-                    <span style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:3px;">
-                      STALELA
-                    </span>
-                  </td>
-                </tr>
-              </table>
+            <td style="background:linear-gradient(135deg,#0a0a0c 0%,#1a1a22 100%);padding:28px 32px;text-align:center;">
+              <p style="margin:0 0 4px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:5px;">
+                STALELA
+              </p>
+              <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#d4a574;letter-spacing:2px;text-transform:uppercase;">
+                Business Services
+              </p>
             </td>
           </tr>
 
@@ -67,7 +55,7 @@ export function buildEmailHtml({
           <!-- Body -->
           <tr>
             <td style="padding:32px 32px 24px;">
-              ${recipientName ? `<p style="margin:0 0 4px 0;color:#999999;font-size:13px;font-family:'Helvetica Neue',Arial,sans-serif;text-transform:uppercase;letter-spacing:1px;">To: ${escapeHtml(recipientName)}${companyName ? ` · ${escapeHtml(companyName)}` : ""}</p>` : ""}
+              ${recipientName ? `<p style="margin:0 0 16px 0;color:#999999;font-size:12px;font-family:'Helvetica Neue',Arial,sans-serif;text-transform:uppercase;letter-spacing:1px;">To: ${escapeHtml(recipientName)}${companyName ? ` · ${escapeHtml(companyName)}` : ""}</p>` : ""}
               <p style="margin:0 0 12px 0;color:#333333;font-size:15px;line-height:1.6;">
                 ${htmlBody}
               </p>
@@ -81,29 +69,50 @@ export function buildEmailHtml({
             </td>
           </tr>
 
-          <!-- Footer -->
+          <!-- Signature -->
           <tr>
-            <td style="padding:24px 32px 28px;text-align:center;">
-              <p style="margin:0 0 6px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#a4785a;font-weight:600;">
-                Stalela Business Services
-              </p>
-              <p style="margin:0 0 4px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#999999;">
-                Professional compliance, registration & advisory services across South Africa
-              </p>
-              <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#bbbbbb;">
-                <a href="https://stalela.com" style="color:#a4785a;text-decoration:none;">stalela.com</a>
+            <td style="padding:24px 32px 28px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <!-- Left accent bar -->
+                  <td width="3" style="background:linear-gradient(180deg,#a4785a,#d4a574);border-radius:2px;">&nbsp;</td>
+                  <td width="16">&nbsp;</td>
+                  <!-- Signature content -->
+                  <td>
+                    <p style="margin:0 0 3px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;font-weight:700;color:#1a1a22;">
+                      George Zharare
+                    </p>
+                    <p style="margin:0 0 8px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#a4785a;font-weight:600;letter-spacing:0.5px;">
+                      Chief Executive Officer · Stalela
+                    </p>
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding-right:16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#666666;">
+                          &#128222;&nbsp;<a href="tel:+27612673163" style="color:#666666;text-decoration:none;">061 267 3163</a>
+                        </td>
+                        <td style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#666666;">
+                          &#127760;&nbsp;<a href="https://stalela.com" style="color:#a4785a;text-decoration:none;">stalela.com</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Bottom bar -->
+          <tr>
+            <td style="background-color:#f9f7f5;padding:14px 32px;border-top:1px solid #e8e4df;text-align:center;">
+              <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#bbbbbb;">
+                Stalela Business Services &nbsp;·&nbsp; South Africa
                 &nbsp;·&nbsp;
-                <a href="mailto:info@stalela.com" style="color:#a4785a;text-decoration:none;">info@stalela.com</a>
+                <a href="https://stalela.com" style="color:#a4785a;text-decoration:none;">stalela.com</a>
               </p>
             </td>
           </tr>
 
         </table>
-
-        <!-- Sub-footer -->
-        <p style="margin:16px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#999999;text-align:center;">
-          This email was crafted with care by Stalela
-        </p>
       </td>
     </tr>
   </table>

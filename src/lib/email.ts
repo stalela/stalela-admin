@@ -14,9 +14,9 @@ import { TransactionalEmailsApi, SendSmtpEmail } from "@getbrevo/brevo";
 const SENDER_NAME = "Stalela";
 const SENDER_EMAIL = "hello@stalela.com";
 
-/** ⚠️ TEST OVERRIDE — redirect ALL outgoing emails to this address.
- *  Set to null (or remove) when ready for production. */
-const TEST_EMAIL_OVERRIDE = "kudzicloud@gmail.com";
+/** Feature flag — set EMAIL_TEST_OVERRIDE in Vercel env vars to redirect
+ *  all outgoing emails to that address. Leave unset in production. */
+const TEST_EMAIL_OVERRIDE = process.env.EMAIL_TEST_OVERRIDE ?? null;
 
 /* ── Lazy API client ──────────────────────────────────────────────── */
 

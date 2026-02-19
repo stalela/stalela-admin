@@ -749,8 +749,8 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
             className="ml-auto flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-foreground"
           >
             <div className={cn(
-              "flex h-3.5 w-3.5 items-center justify-center rounded border transition-colors",
-              allFilteredSelected ? "border-copper-600 bg-copper-600" : "border-border"
+              "flex h-3.5 w-3.5 items-center justify-center rounded border-2 transition-colors",
+              allFilteredSelected ? "border-copper-600 bg-copper-600" : "border-white/60"
             )}>
               {allFilteredSelected && <svg className="h-2 w-2 text-white" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
             </div>
@@ -810,8 +810,8 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                   className="flex-shrink-0 rounded p-1 hover:bg-surface-elevated"
                 >
                   <div className={cn(
-                    "flex h-4 w-4 items-center justify-center rounded border transition-colors",
-                    isSelected ? "border-copper-600 bg-copper-600" : "border-border"
+                    "flex h-4 w-4 items-center justify-center rounded border-2 transition-colors",
+                    isSelected ? "border-copper-600 bg-copper-600" : "border-white/60"
                   )}>
                     {isSelected && <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                   </div>

@@ -356,19 +356,19 @@ FORMAT (use markdown):
 # 📰 Daily News Briefing — ${today}
 
 ## 🇿🇦 South Africa & Africa
-- **Headline**: 2-3 sentence summary with context. [Source](url)
+- [**Headline**](https://full-article-url): 2-3 sentence summary with context. Source: Publication Name
 - ...
 
 ## 🤖 AI & Tech
-- **Headline**: 2-3 sentence summary. [Source](url)
+- [**Headline**](https://full-article-url): 2-3 sentence summary. Source: Publication Name
 - ...
 
 ## 💰 Fintech & B2B
-- **Headline**: 2-3 sentence summary. [Source](url)
+- [**Headline**](https://full-article-url): 2-3 sentence summary. Source: Publication Name
 - ...
 
 ## 💻 Dev & Engineering
-- **Headline**: 2-3 sentence summary. [Source](url)
+- [**Headline**](https://full-article-url): 2-3 sentence summary. Source: Publication Name
 - ...
 
 ## 🔮 One Thing to Watch
@@ -376,9 +376,9 @@ A single paragraph about an emerging trend worth tracking.
 
 RULES:
 - 8-12 stories total, prioritize South Africa + Africa first
-- EVERY story MUST have a clickable source link in [Source Name](https://full-url) format
+- EVERY headline MUST be a clickable markdown link: [**Headline text**](https://full-article-url)
 - Use the ACTUAL URL from your web search — never use placeholder or example.com URLs
-- Each story: bold headline, 2-3 sentence summary, source link at the end
+- Each story: linked headline, 2-3 sentence summary, plain source name at end
 - Only include REAL news from today or this week — do not fabricate stories or URLs
 - Be opinionated — add brief "why it matters" where relevant
 - Keep the whole digest under 800 words`,

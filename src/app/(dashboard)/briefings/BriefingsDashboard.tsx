@@ -509,7 +509,7 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                   prose-p:text-muted prose-p:leading-relaxed
                   prose-li:text-muted prose-li:leading-relaxed
                   prose-strong:text-foreground
-                  prose-a:text-copper-light prose-a:no-underline hover:prose-a:underline
+                  prose-a:text-copper-light prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-copper-600
                   prose-ul:space-y-2"
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(news.content) }}
               />

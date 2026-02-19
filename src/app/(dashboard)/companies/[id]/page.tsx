@@ -21,6 +21,7 @@ import { Card, CardHeader, CardTitle } from "@/components/Card";
 import { DataTable } from "@/components/DataTable";
 import { MiniMap } from "./MiniMap";
 import { ResearchButton } from "./ResearchButton";
+import { LinkedInButton } from "./LinkedInButton";
 import type { Company } from "@stalela/commons/types";
 
 export const dynamic = "force-dynamic";
@@ -126,6 +127,7 @@ export default async function CompanyDetailPage({ params }: Props) {
             {company.premium_seller && <Badge variant="warning">Premium</Badge>}
             <div className="ml-auto flex items-center gap-2">
               <ResearchButton companyId={company.id} companyName={company.name} />
+              <LinkedInButton companyId={company.id} companyName={company.name} />
               <Link
                 href={`/companies/graph?companyId=${company.id}&name=${encodeURIComponent(company.name)}`}
                 className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:bg-surface-hover hover:text-copper-light transition-colors"

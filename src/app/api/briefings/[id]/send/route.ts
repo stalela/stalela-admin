@@ -17,9 +17,12 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { to, toName } = (await request.json()) as {
+    const { to, toName, subject: subjectOverride, body: bodyOverride, attachments } = (await request.json()) as {
       to: string;
       toName?: string;
+      subject?: string;
+      body?: string;
+      attachments?: Array<{ name: string; content: string }>;
     };
 
     if (!to) {
@@ -31,23 +34,31 @@ export async function POST(
 
     const briefing = await briefingsApi.getById(id);
 
-    if (!briefing.email_draft_body) {
+    const draftBody = bodyOverride ?? briefing.email_draft_body;
+    if (!draftBody) {
       return NextResponse.json(
         { error: "This briefing has no email draft yet" },
         { status: 422 }
       );
     }
 
-    const subject = briefing.email_draft_subject ?? `Opportunity: ${briefing.opportunity_type} — ${briefing.company_name}`;
+    const subject = subjectOverride ?? briefing.email_draft_subject ?? `Opportunity: ${briefing.opportunity_type} — ${briefing.company_name}`;
 
     const html = buildEmailHtml({
       subject,
-      body: briefing.email_draft_body,
+      body: draftBody,
       recipientName: toName,
       companyName: briefing.company_name,
     });
 
-    await sendEmail({ to, toName, subject, htmlContent: html });
+    await sendEmail({
+      to,
+      toName,
+      subject,
+      htmlContent: html,
+      replyTo: process.env.CLOUDMAILIN_ADDRESS ?? undefined,
+      attachments: attachments?.length ? attachments : undefined,
+    });
 
     // Mark briefing as sent
     await briefingsApi.update(id, {

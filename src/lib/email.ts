@@ -51,6 +51,8 @@ export interface SendEmailOptions {
   replyTo?: string;
   /** Additional headers (optional) */
   headers?: Record<string, string>;
+  /** Base64-encoded file attachments (name + base64 content) */
+  attachments?: Array<{ name: string; content: string }>;
 }
 
 /* ── Core send function ────────────────────────────────────────────── */
@@ -71,6 +73,12 @@ export async function sendEmail(opts: SendEmailOptions): Promise<void> {
   if (opts.textContent) message.textContent = opts.textContent;
   if (opts.replyTo) message.replyTo = { email: opts.replyTo };
   if (opts.headers) message.headers = opts.headers;
+  if (opts.attachments?.length) {
+    message.attachment = opts.attachments.map((a) => ({
+      name: a.name,
+      content: a.content,
+    }));
+  }
 
   await api.sendTransacEmail(message);
 }

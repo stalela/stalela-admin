@@ -10,15 +10,20 @@ import {
   ChevronRight,
   Clock,
   ClipboardCopy,
+  Edit3,
   Loader2,
   Mail,
   Newspaper,
+  Paperclip,
   Phone,
+  Save,
   Send,
   SendHorizontal,
   SkipForward,
   Sparkles,
   Target,
+  Users,
+  X,
   XCircle,
 } from "lucide-react";
 import type { DailyBriefing, DailyNews, BriefingStatus } from "@stalela/commons/types";
@@ -32,6 +37,12 @@ import { buildEmailHtml, copyHtmlToClipboard } from "@/lib/email-template";
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+interface FileAttachment {
+  name: string;
+  content: string; // base64
+  displayName: string;
 }
 
 /* ── Types ────────────────────────────────────────────────────── */
@@ -80,6 +91,27 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
   const [activeTab, setActiveTab] = useState<"outreach" | "news" | "ai">("outreach");
   const [copied, setCopied] = useState<string | null>(null);
 
+  /* ── Bulk select ────────────────────────────────────────────────── */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTo, setBulkTo] = useState("");
+  const [bulkToName, setBulkToName] = useState("");
+  const [bulkAttachments, setBulkAttachments] = useState<FileAttachment[]>([]);
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ sent: number; failed: number } | null>(null);
+
+  /* ── Inline draft edit ──────────────────────────────────────────── */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  /* ── Per-card send panel ────────────────────────────────────────── */
+  const [sendPanelId, setSendPanelId] = useState<string | null>(null);
+  const [sendTo, setSendTo] = useState("");
+  const [sendToName, setSendToName] = useState("");
+  const [sendAttachments, setSendAttachments] = useState<FileAttachment[]>([]);
+  const [sending, setSending] = useState<string | null>(null);
+
   /* ── AI Chat state ──────────────────────────────────────────── */
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -99,7 +131,34 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
   const filtered = filter === "all"
     ? briefings
     : briefings.filter((b) => b.status === filter);
+  const allFilteredSelected = filtered.length > 0 && filtered.every((b) => selectedIds.has(b.id));
 
+  /* ── File helpers ───────────────────────────────────────────────── */
+
+  async function fileToBase64(file: File): Promise<FileAttachment> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(",")[1];
+        resolve({ name: file.name, content: base64, displayName: file.name });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function pickFiles(existing: FileAttachment[], setter: (a: FileAttachment[]) => void) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.csv";
+    input.onchange = async () => {
+      if (!input.files) return;
+      const newFiles = await Promise.all(Array.from(input.files).map(fileToBase64));
+      setter([...existing, ...newFiles]);
+    };
+    input.click();
+  }
   /* ── Actions ────────────────────────────────────────────────── */
 
   async function updateStatus(id: string, status: BriefingStatus) {
@@ -150,6 +209,101 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
     if (ok) {
       setCopied(briefing.id);
       setTimeout(() => setCopied(null), 3000);
+    }
+  }
+
+  /* ── Inline edit draft ──────────────────────────────────────────── */
+
+  function startEdit(briefing: DailyBriefing) {
+    setEditingId(briefing.id);
+    setEditSubject(briefing.email_draft_subject ?? "");
+    setEditBody(briefing.email_draft_body ?? "");
+  }
+
+  async function saveEdit(id: string) {
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/briefings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email_draft_subject: editSubject, email_draft_body: editBody }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setEditingId(null);
+      router.refresh();
+    } catch (err) {
+      console.error("[briefings] save draft:", err);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  /* ── Per-card send panel ────────────────────────────────────────── */
+
+  function openSendPanel(briefing: DailyBriefing) {
+    if (sendPanelId === briefing.id) { setSendPanelId(null); return; }
+    setSendPanelId(briefing.id);
+    setSendTo("");
+    setSendToName("");
+    setSendAttachments([]);
+  }
+
+  async function sendBriefingEmail(briefing: DailyBriefing) {
+    if (!sendTo.trim()) return;
+    setSending(briefing.id);
+    try {
+      const res = await fetch(`/api/briefings/${briefing.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: sendTo.trim(),
+          toName: sendToName.trim() || undefined,
+          attachments: sendAttachments.map(({ name, content }) => ({ name, content })),
+        }),
+      });
+      if (!res.ok) throw new Error("Send failed");
+      setSendPanelId(null);
+      setSendTo("");
+      setSendToName("");
+      setSendAttachments([]);
+      router.refresh();
+    } catch (err) {
+      console.error("[briefings] send:", err);
+    } finally {
+      setSending(null);
+    }
+  }
+
+  /* ── Bulk send ──────────────────────────────────────────────────── */
+
+  async function bulkSendEmails() {
+    if (!bulkTo.trim() || selectedIds.size === 0) return;
+    setBulkSending(true);
+    setBulkResult(null);
+    try {
+      const sends = Array.from(selectedIds).map((id) => ({
+        id,
+        to: bulkTo.trim(),
+        toName: bulkToName.trim() || undefined,
+        attachments: bulkAttachments.map(({ name, content }) => ({ name, content })),
+      }));
+      const res = await fetch("/api/briefings/bulk-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sends }),
+      });
+      if (!res.ok) throw new Error("Bulk send failed");
+      const result = (await res.json()) as { sent: string[]; failed: Array<{ id: string; error: string }> };
+      setBulkResult({ sent: result.sent.length, failed: result.failed.length });
+      setSelectedIds(new Set());
+      setBulkTo("");
+      setBulkToName("");
+      setBulkAttachments([]);
+      router.refresh();
+    } catch (err) {
+      console.error("[briefings] bulk send:", err);
+    } finally {
+      setBulkSending(false);
     }
   }
 
@@ -562,8 +716,8 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
         />
       </div>
 
-      {/* Filter pills */}
-      <div className="flex flex-wrap gap-2">
+      {/* Filter pills + Select all */}
+      <div className="flex flex-wrap items-center gap-2">
         {(["all", "pending", "reviewed", "sent", "skipped"] as const).map((f) => (
           <button
             key={f}
@@ -583,6 +737,26 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
             )}
           </button>
         ))}
+        {filtered.length > 0 && (
+          <button
+            onClick={() => {
+              if (allFilteredSelected) {
+                setSelectedIds((prev) => { const n = new Set(prev); filtered.forEach((b) => n.delete(b.id)); return n; });
+              } else {
+                setSelectedIds((prev) => { const n = new Set(prev); filtered.forEach((b) => n.add(b.id)); return n; });
+              }
+            }}
+            className="ml-auto flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-foreground"
+          >
+            <div className={cn(
+              "flex h-3.5 w-3.5 items-center justify-center rounded border transition-colors",
+              allFilteredSelected ? "border-copper-600 bg-copper-600" : "border-border"
+            )}>
+              {allFilteredSelected && <svg className="h-2 w-2 text-white" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+            </div>
+            {allFilteredSelected ? "Deselect all" : "Select all"}
+          </button>
+        )}
       </div>
 
       {/* Empty state */}
@@ -607,6 +781,10 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
         {filtered.map((briefing) => {
           const isExpanded = expandedId === briefing.id;
           const isUpdating = updating === briefing.id;
+          const isEditing = editingId === briefing.id;
+          const isSendOpen = sendPanelId === briefing.id;
+          const isSending = sending === briefing.id;
+          const isSelected = selectedIds.has(briefing.id);
           const prio = priorityLabel[briefing.priority] ?? priorityLabel[3];
           const badge = statusBadge[briefing.status];
 
@@ -615,40 +793,62 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
               key={briefing.id}
               className={cn(
                 "group rounded-xl border border-border bg-surface transition-all duration-200",
-                isExpanded && "border-copper-600/40 shadow-lg shadow-copper-600/5"
+                isExpanded && "border-copper-600/40 shadow-lg shadow-copper-600/5",
+                isSelected && "border-copper-600/60"
               )}
             >
-              {/* Collapsed header */}
-              <button
-                onClick={() => setExpandedId(isExpanded ? null : briefing.id)}
-                className="flex w-full items-center gap-4 p-4 text-left"
-              >
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-copper-600/10">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-copper-600" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-copper-600" />
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-semibold text-foreground">
-                      {briefing.company_name}
-                    </span>
-                    <Badge variant={badge.variant}>{badge.label}</Badge>
-                    <span className={cn("text-xs font-medium", prio.color)}>
-                      P{briefing.priority}
-                    </span>
+              {/* Collapsed header row */}
+              <div className="flex items-center gap-2 px-3 py-3">
+                {/* Checkbox */}
+                <button
+                  title={isSelected ? "Deselect" : "Select for bulk send"}
+                  onClick={() => setSelectedIds((prev) => {
+                    const n = new Set(prev);
+                    if (n.has(briefing.id)) n.delete(briefing.id); else n.add(briefing.id);
+                    return n;
+                  })}
+                  className="flex-shrink-0 rounded p-1 hover:bg-surface-elevated"
+                >
+                  <div className={cn(
+                    "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                    isSelected ? "border-copper-600 bg-copper-600" : "border-border"
+                  )}>
+                    {isSelected && <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                   </div>
-                  <p className="mt-0.5 truncate text-sm text-muted">
-                    <span className="font-medium text-copper-light">
-                      {briefing.opportunity_type}
-                    </span>
-                    {" — "}
-                    {briefing.opportunity_summary}
-                  </p>
-                </div>
+                </button>
+
+                {/* Expand toggle */}
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : briefing.id)}
+                  className="flex flex-1 items-center gap-3 text-left"
+                >
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-copper-600/10">
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-copper-600" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-copper-600" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-semibold text-foreground">
+                        {briefing.company_name}
+                      </span>
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      <span className={cn("text-xs font-medium", prio.color)}>
+                        P{briefing.priority}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-sm text-muted">
+                      <span className="font-medium text-copper-light">
+                        {briefing.opportunity_type}
+                      </span>
+                      {" — "}
+                      {briefing.opportunity_summary}
+                    </p>
+                  </div>
+                </button>
 
                 {/* Quick actions (visible on hover) */}
                 <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -688,7 +888,7 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                     />
                   )}
                 </div>
-              </button>
+              </div>
 
               {/* Expanded content */}
               {isExpanded && (
@@ -696,11 +896,60 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                   <div className="grid gap-6 lg:grid-cols-2">
                     {/* Email Draft */}
                     <div>
-                      <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Mail className="h-4 w-4 text-copper-600" />
-                        Email Draft
-                      </h4>
-                      {briefing.email_draft_subject ? (
+                      <div className="mb-2 flex items-center gap-2">
+                        <h4 className="flex flex-1 items-center gap-2 text-sm font-semibold text-foreground">
+                          <Mail className="h-4 w-4 text-copper-600" />
+                          Email Draft
+                        </h4>
+                        {!isEditing && briefing.email_draft_body && (
+                          <button
+                            onClick={() => startEdit(briefing)}
+                            className="inline-flex items-center gap-1 rounded-md bg-surface-elevated px-2 py-1 text-xs text-muted hover:text-foreground transition-colors"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                            Edit
+                          </button>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="mb-1 block text-xs text-muted">Subject</label>
+                            <input
+                              value={editSubject}
+                              onChange={(e) => setEditSubject(e.target.value)}
+                              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-copper-600 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs text-muted">Body</label>
+                            <textarea
+                              value={editBody}
+                              onChange={(e) => setEditBody(e.target.value)}
+                              rows={10}
+                              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-copper-600 focus:outline-none"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              disabled={savingEdit}
+                              onClick={() => saveEdit(briefing.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-copper-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-copper-700 disabled:opacity-50"
+                            >
+                              {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-elevated px-3 py-1.5 text-sm font-medium text-muted hover:text-foreground"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : briefing.email_draft_subject ? (
                         <div className="rounded-lg border border-border bg-background p-4">
                           <p className="mb-2 text-sm font-medium text-foreground">
                             Subject: {briefing.email_draft_subject}
@@ -710,9 +959,7 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm italic text-muted">
-                          No email draft generated.
-                        </p>
+                        <p className="text-sm italic text-muted">No email draft generated.</p>
                       )}
                     </div>
 
@@ -762,27 +1009,37 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                         Mark Reviewed
                       </button>
                     )}
-                    {(briefing.status === "pending" || briefing.status === "reviewed") &&
-                      briefing.email_draft_body && (
-                        <button
-                          disabled={isUpdating}
-                          onClick={() => {
-                            openGmail(briefing);
-                            updateStatus(briefing.id, "sent");
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-copper-600/10 px-3 py-2 text-sm font-medium text-copper-light transition-colors hover:bg-copper-600/20 disabled:opacity-50"
-                        >
-                          <Send className="h-4 w-4" />
-                          Send via Gmail
-                        </button>
-                      )}
+                    {briefing.email_draft_body && (
+                      <button
+                        disabled={isUpdating || isSending}
+                        onClick={() => openSendPanel(briefing)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50",
+                          isSendOpen
+                            ? "bg-copper-600 text-white"
+                            : "bg-copper-600/10 text-copper-light hover:bg-copper-600/20"
+                        )}
+                      >
+                        <Send className="h-4 w-4" />
+                        Send Email
+                      </button>
+                    )}
+                    {briefing.email_draft_body && (
+                      <button
+                        onClick={() => openGmail(briefing)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-surface-elevated px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-foreground"
+                      >
+                        <Mail className="h-4 w-4" />
+                        Open Gmail
+                      </button>
+                    )}
                     {briefing.email_draft_body && (
                       <button
                         onClick={() => copyBrandedEmail(briefing)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-vibranium/10 px-3 py-2 text-sm font-medium text-vibranium transition-colors hover:bg-vibranium/20"
                       >
                         <ClipboardCopy className="h-4 w-4" />
-                        {copied === briefing.id ? "Copied!" : "Copy Branded Email"}
+                        {copied === briefing.id ? "Copied!" : "Copy HTML"}
                       </button>
                     )}
                     {briefing.status === "pending" && (
@@ -802,12 +1059,167 @@ export function BriefingsDashboard({ date, today, briefings, stats, availableDat
                       })}
                     </span>
                   </div>
+
+                  {/* ── Send Panel ─────────────────────────────────── */}
+                  {isSendOpen && (
+                    <div className="mt-3 rounded-xl border border-copper-600/30 bg-copper-600/5 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h5 className="text-sm font-semibold text-foreground">Send via Brevo</h5>
+                        <button onClick={() => setSendPanelId(null)} className="rounded p-1 text-muted hover:text-foreground">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs text-muted">To (email) *</label>
+                          <input
+                            type="email"
+                            value={sendTo}
+                            onChange={(e) => setSendTo(e.target.value)}
+                            placeholder="contact@company.co.za"
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-muted">Name (optional)</label>
+                          <input
+                            type="text"
+                            value={sendToName}
+                            onChange={(e) => setSendToName(e.target.value)}
+                            placeholder="John Smith"
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      {sendAttachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {sendAttachments.map((a, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 rounded-md bg-surface-elevated px-2 py-1 text-xs text-muted">
+                              <Paperclip className="h-3 w-3" />
+                              {a.displayName}
+                              <button onClick={() => setSendAttachments((prev) => prev.filter((_, j) => j !== i))} className="ml-0.5 hover:text-foreground">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          onClick={() => pickFiles(sendAttachments, setSendAttachments)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted transition-colors hover:text-foreground"
+                        >
+                          <Paperclip className="h-3.5 w-3.5" />
+                          Attach files
+                        </button>
+                        <div className="ml-auto flex gap-2">
+                          <button onClick={() => setSendPanelId(null)} className="rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground">
+                            Cancel
+                          </button>
+                          <button
+                            disabled={!sendTo.trim() || isSending}
+                            onClick={() => sendBriefingEmail(briefing)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-copper-600 px-4 py-2 text-sm font-medium text-white hover:bg-copper-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            Send
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* ── Bulk Send Bar ─────────────────────────────────────── */}
+      {selectedIds.size > 0 && (
+        <div className="sticky bottom-4 z-20 rounded-xl border border-copper-600/40 bg-surface shadow-2xl shadow-black/50">
+          <div className="flex items-center gap-3 border-b border-border px-4 pt-3 pb-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-copper-600/10">
+              <Users className="h-4 w-4 text-copper-600" />
+            </div>
+            <span className="text-sm font-semibold text-foreground">
+              {selectedIds.size} briefing{selectedIds.size > 1 ? "s" : ""} selected
+            </span>
+            {bulkResult && (
+              <span className={cn(
+                "ml-2 rounded-full px-2 py-0.5 text-xs font-medium",
+                bulkResult.failed > 0 ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
+              )}>
+                {bulkResult.sent} sent{bulkResult.failed > 0 ? `, ${bulkResult.failed} failed` : ""}
+              </span>
+            )}
+            <button
+              onClick={() => { setSelectedIds(new Set()); setBulkResult(null); }}
+              className="ml-auto rounded p-1 text-muted hover:text-foreground"
+              title="Clear selection"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="space-y-3 p-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs text-muted">Recipient email *</label>
+                <input
+                  type="email"
+                  value={bulkTo}
+                  onChange={(e) => setBulkTo(e.target.value)}
+                  placeholder="manager@stalela.com"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted">Recipient name (optional)</label>
+                <input
+                  type="text"
+                  value={bulkToName}
+                  onChange={(e) => setBulkToName(e.target.value)}
+                  placeholder="Full name"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-copper-600 focus:outline-none"
+                />
+              </div>
+            </div>
+            {bulkAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {bulkAttachments.map((a, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-md bg-surface-elevated px-2 py-1 text-xs text-muted">
+                    <Paperclip className="h-3 w-3" />
+                    {a.displayName}
+                    <button onClick={() => setBulkAttachments((prev) => prev.filter((_, j) => j !== i))} className="ml-0.5 hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => pickFiles(bulkAttachments, setBulkAttachments)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted transition-colors hover:text-foreground"
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+                Attach to all
+              </button>
+              <button
+                disabled={!bulkTo.trim() || bulkSending}
+                onClick={bulkSendEmails}
+                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-copper-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-copper-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {bulkSending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Sending…</>
+                ) : (
+                  <><Send className="h-4 w-4" />Send {selectedIds.size} Email{selectedIds.size > 1 ? "s" : ""}</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       </>)}
     </div>
